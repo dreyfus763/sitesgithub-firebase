@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analista IA Pro — Mercado de Ações</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg: #080d1a;
+  --surface: #0f1726;
+  --surface2: #162035;
+  --border: #1c2a40;
+  --accent: #00e5a0;
+  --blue: #3b82f6;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --purple: #a855f7;
+  --text: #e2e8f0;
+  --muted: #4b6280;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Space Grotesk', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,160,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,160,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.container { max-width: 960px; margin: 0 auto; padding: 36px 20px; position: relative; z-index: 1; }
+
+/* HEADER */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--accent);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.eyebrow::before { content:''; width:20px; height:1px; background:var(--accent); display:inline-block; }
+
+h1 {
+  font-size: clamp(26px, 4.5vw, 44px);
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+h1 em { font-style:normal; color:var(--accent); }
+
+.subtitle { color:var(--muted); font-size:14px; line-height:1.6; max-width:540px; margin-bottom:36px; }
+
+/* SEARCH CARD */
+.search-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 28px;
+  margin-bottom: 28px;
+}
+
+.field-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.search-row { display:flex; gap:10px; margin-bottom:18px; }
+
+.ticker-input {
+  flex:1; background:var(--bg); border:1.5px solid var(--border);
+  border-radius:10px; padding:14px 18px; color:var(--text);
+  font-family:var(--mono); font-size:20px; font-weight:700;
+  letter-spacing:3px; text-transform:uppercase; outline:none;
+  transition: border-color .2s;
+}
+.ticker-input::placeholder { color:var(--muted); font-weight:400; letter-spacing:1px; font-size:13px; }
+.ticker-input:focus { border-color:var(--accent); }
+
+.go-btn {
+  background: var(--accent); color:#000; border:none;
+  border-radius:10px; padding:14px 26px; font-family:var(--sans);
+  font-size:14px; font-weight:700; cursor:pointer;
+  transition: opacity .2s, transform .1s; white-space:nowrap;
+}
+.go-btn:hover:not(:disabled) { opacity:.85; }
+.go-btn:active:not(:disabled) { transform:scale(.98); }
+.go-btn:disabled { opacity:.35; cursor:not-allowed; }
+
+.context-input {
+  width:100%; background:var(--bg); border:1.5px solid var(--border);
+  border-radius:10px; padding:12px 16px; color:var(--text);
+  font-family:var(--sans); font-size:14px; outline:none;
+  resize:none; height:72px; transition:border-color .2s; line-height:1.5;
+}
+.context-input::placeholder { color:var(--muted); }
+.context-input:focus { border-color:var(--accent); }
+
+.pills { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center; }
+.pill-label { font-family:var(--mono); font-size:10px; color:var(--muted); }
+.pill {
+  font-family:var(--mono); font-size:11px; padding:5px 13px;
+  border-radius:20px; border:1px solid var(--border); color:var(--muted);
+  cursor:pointer; transition:all .15s; background:transparent;
+}
+.pill:hover { border-color:var(--accent); color:var(--accent); background:rgba(0,229,160,.06); }
+
+/* STATUS */
+.status-bar {
+  display:none; align-items:center; gap:14px;
+  padding:14px 18px; background:var(--surface2);
+  border:1px solid var(--border); border-radius:10px;
+  margin-bottom:24px; font-family:var(--mono); font-size:12px; color:var(--accent);
+}
+.status-bar.on { display:flex; }
+.spinner {
+  width:16px; height:16px; border:2px solid rgba(0,229,160,.2);
+  border-top-color:var(--accent); border-radius:50%;
+  animation:spin .7s linear infinite; flex-shrink:0;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+.step-dots { display:flex; gap:5px; margin-left:auto; }
+.step-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--border); transition:background .3s;
+}
+.step-dot.done { background:var(--accent); }
+.step-dot.active { background:var(--accent); box-shadow:0 0 6px var(--accent); }
+
+/* ERROR */
+.err { display:none; padding:18px 20px; background:rgba(239,68,68,.08);
+  border:1px solid rgba(239,68,68,.22); border-radius:12px;
+  color:var(--danger); font-size:14px; margin-bottom:22px; }
+.err.on { display:block; }
+
+/* RESULT */
+.result { display:none; }
+.result.on { display:block; }
+
+/* TOP ROW: recommendation + score */
+.top-row {
+  display:grid; grid-template-columns:1fr 220px;
+  gap:16px; margin-bottom:16px; align-items:stretch;
+}
+@media(max-width:640px){ .top-row { grid-template-columns:1fr; } }
+
+.rec-card {
+  background:var(--surface); border:1.5px solid var(--border);
+  border-radius:16px; padding:26px; display:flex;
+  flex-direction:column; justify-content:space-between;
+}
+
+.rec-badge {
+  display:inline-flex; align-items:center; gap:10px;
+  padding:10px 20px; border-radius:10px; font-weight:700;
+  font-size:18px; letter-spacing:1px; margin-bottom:14px;
+  width:fit-content;
+}
+.rec-badge.buy   { background:rgba(0,229,160,.12); color:var(--accent); border:1.5px solid var(--accent); }
+.rec-badge.sell  { background:rgba(239,68,68,.1);  color:var(--danger); border:1.5px solid var(--danger); }
+.rec-badge.hold  { background:rgba(245,158,11,.1); color:var(--warn);   border:1.5px solid var(--warn); }
+
+.rec-title { font-size:13px; color:var(--muted); margin-bottom:6px; font-family:var(--mono); letter-spacing:1px; text-transform:uppercase; }
+.rec-justification { font-size:14px; line-height:1.6; color:var(--text); }
+
+.score-card {
+  background:var(--surface); border:1.5px solid var(--border);
+  border-radius:16px; padding:26px; display:flex;
+  flex-direction:column; align-items:center; justify-content:center; gap:12px;
+}
+
+.score-ring {
+  width:110px; height:110px; border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  border:3px solid var(--accent); position:relative;
+}
+.score-num { font-family:var(--mono); font-size:36px; font-weight:700; line-height:1; }
+.score-sub { font-size:10px; color:var(--muted); letter-spacing:1px; margin-top:2px; }
+.score-label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+
+/* SENTIMENT ROW */
+.sentiment-row {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:16px; margin-bottom:16px;
+}
+@media(max-width:640px){ .sentiment-row { grid-template-columns:1fr; } }
+
+.sent-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:20px;
+}
+.sent-title { font-family:var(--mono); font-size:10px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; margin-bottom:14px; display:flex; align-items:center; gap:7px; }
+.sent-title .dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+.trend-arrow { font-size:28px; margin-bottom:4px; }
+.trend-label { font-weight:700; font-size:15px; margin-bottom:4px; }
+.trend-desc { font-size:12px; color:var(--muted); line-height:1.5; }
+
+.sentiment-bar-wrap { margin-top:6px; }
+.sbar-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+.sbar { height:8px; border-radius:99px; background:var(--border); overflow:hidden; }
+.sbar-fill { height:100%; border-radius:99px; transition:width .8s ease; }
+
+/* STRATEGIES */
+.strat-row {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:16px; margin-bottom:16px;
+}
+@media(max-width:640px){ .strat-row { grid-template-columns:1fr; } }
+
+.strat-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:22px;
+}
+.strat-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.strat-icon { font-size:22px; }
+.strat-name { font-size:14px; font-weight:700; }
+.strat-sub { font-size:11px; color:var(--muted); }
+
+.strat-rec-label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.strat-rec-value { font-size:15px; font-weight:700; margin-bottom:12px; }
+.strat-body { font-size:13px; color:var(--text); line-height:1.6; }
+.strat-body strong { color:var(--accent); }
+
+/* NEWS */
+.news-section { margin-bottom:16px; }
+.section-title {
+  font-family:var(--mono); font-size:10px; letter-spacing:2.5px;
+  text-transform:uppercase; color:var(--muted);
+  margin-bottom:12px; display:flex; align-items:center; gap:10px;
+}
+.section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+.news-grid { display:flex; flex-direction:column; gap:10px; }
+
+.news-item {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:16px 18px;
+  display:grid; grid-template-columns:auto 1fr auto;
+  gap:14px; align-items:start;
+}
+
+.news-sentiment {
+  width:8px; height:8px; border-radius:50%;
+  margin-top:5px; flex-shrink:0;
+}
+.news-sentiment.pos { background:var(--accent); }
+.news-sentiment.neg { background:var(--danger); }
+.news-sentiment.neu { background:var(--warn); }
+
+.news-text {}
+.news-headline { font-size:13px; font-weight:600; margin-bottom:3px; line-height:1.4; }
+.news-summary { font-size:12px; color:var(--muted); line-height:1.5; }
+.news-tag {
+  font-family:var(--mono); font-size:10px; letter-spacing:1px;
+  padding:3px 9px; border-radius:6px; font-weight:700;
+  white-space:nowrap; align-self:start;
+}
+.news-tag.pos { background:rgba(0,229,160,.1); color:var(--accent); }
+.news-tag.neg { background:rgba(239,68,68,.1);  color:var(--danger); }
+.news-tag.neu { background:rgba(245,158,11,.1); color:var(--warn); }
+
+/* MAIN GRID */
+.main-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:16px; margin-bottom:16px;
+}
+@media(max-width:640px){ .main-grid { grid-template-columns:1fr; } }
+
+.info-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:22px;
+}
+.info-card.full { grid-column:1/-1; }
+
+.card-title {
+  font-family:var(--mono); font-size:10px; letter-spacing:2px;
+  color:var(--muted); text-transform:uppercase;
+  margin-bottom:12px; display:flex; align-items:center; gap:8px;
+}
+.card-title .cdot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+.card-body { font-size:13px; line-height:1.7; color:var(--text); }
+.card-body strong { color:var(--accent); }
+.card-body ul { list-style:none; padding:0; display:flex; flex-direction:column; gap:5px; }
+.card-body li::before { content:'→ '; color:var(--accent); font-family:var(--mono); font-size:11px; }
+
+/* WATCHLIST */
+.watch-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+@media(max-width:600px){ .watch-grid { grid-template-columns:1fr 1fr; } }
+.watch-item {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:10px; padding:14px;
+}
+.watch-event { font-size:12px; font-weight:600; margin-bottom:3px; line-height:1.3; }
+.watch-date { font-family:var(--mono); font-size:10px; color:var(--accent); }
+
+/* DISCLAIMER */
+.disclaimer {
+  padding:14px 18px; background:rgba(245,158,11,.07);
+  border:1px solid rgba(245,158,11,.18); border-radius:10px;
+  font-size:11.5px; color:var(--warn); line-height:1.6; margin-top:24px;
+}
+
+/* RESULT HEADER */
+.result-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:20px; flex-wrap:wrap; gap:10px;
+}
+.ticker-badge { font-family:var(--mono); font-size:30px; font-weight:700; color:var(--accent); letter-spacing:3px; }
+.ts { font-family:var(--mono); font-size:10px; color:var(--muted); }
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(14px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.anim { animation:fadeUp .45s ease forwards; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="eyebrow">Análise Completa com IA · B3</div>
+  <h1>Analista <em>Pro</em><br>de Ações</h1>
+  <p class="subtitle">IA pesquisa fundamentos, notícias, sentimento do mercado, tendência técnica e estratégias — você só decide.</p>
+
+  <!-- SEARCH -->
+  <div class="search-card">
+    <span class="field-label">Ticker do ativo</span>
+    <div class="search-row">
+      <input class="ticker-input" id="tickerInput" type="text" placeholder="Ex: BBAS3, PETR4, VALE3…" maxlength="8" />
+      <button class="go-btn" id="goBtn" onclick="runAnalysis()">Analisar</button>
+    </div>
+
+    <span class="field-label">Contexto adicional <span style="font-size:9px;color:var(--muted)">(opcional)</span></span>
+    <textarea class="context-input" id="ctxInput" placeholder="Ex: Tenho visão de longo prazo, foco em dividendos. Ou: estou pensando no ciclo do agro para BBAS3…"></textarea>
+
+    <div class="pills">
+      <span class="pill-label">Exemplos:</span>
+      <button class="pill" onclick="setTicker('BBAS3')">BBAS3</button>
+      <button class="pill" onclick="setTicker('PETR4')">PETR4</button>
+      <button class="pill" onclick="setTicker('VALE3')">VALE3</button>
+      <button class="pill" onclick="setTicker('ITUB4')">ITUB4</button>
+      <button class="pill" onclick="setTicker('WEGE3')">WEGE3</button>
+      <button class="pill" onclick="setTicker('TAEE11')">TAEE11</button>
+      <button class="pill" onclick="setTicker('CPLE6')">CPLE6</button>
+      <button class="pill" onclick="setTicker('MGLU3')">MGLU3</button>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="status-bar" id="statusBar">
+    <div class="spinner"></div>
+    <span id="statusTxt">Iniciando…</span>
+    <div class="step-dots" id="stepDots"></div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="err" id="errBox"></div>
+
+  <!-- RESULT -->
+  <div class="result" id="resultWrap"></div>
+
+</div>
+
+<script>
+const STEPS = [
+  "Buscando cotação e dados fundamentalistas…",
+  "Rastreando notícias e eventos recentes…",
+  "Analisando sentimento do mercado…",
+  "Avaliando tendência técnica…",
+  "Calculando estratégias de dividendos e trade…",
+  "Consolidando análise completa…",
+];
+
+let stepIdx = 0, stepTimer;
+
+function setTicker(t) { document.getElementById('tickerInput').value = t; }
+
+function startProgress() {
+  stepIdx = 0;
+  const dots = document.getElementById('stepDots');
+  dots.innerHTML = STEPS.map((_,i) => `<div class="step-dot" id="dot${i}"></div>`).join('');
+  document.getElementById('statusTxt').textContent = STEPS[0];
+  document.getElementById('dot0').className = 'step-dot active';
+  stepTimer = setInterval(() => {
+    document.getElementById(`dot${stepIdx}`).className = 'step-dot done';
+    stepIdx = Math.min(stepIdx + 1, STEPS.length - 1);
+    document.getElementById(`dot${stepIdx}`).className = 'step-dot active';
+    document.getElementById('statusTxt').textContent = STEPS[stepIdx];
+  }, 3500);
+}
+
+function stopProgress() {
+  clearInterval(stepTimer);
+  document.getElementById('statusBar').classList.remove('on');
+}
+
+function showErr(m) {
+  const b = document.getElementById('errBox');
+  b.textContent = m; b.classList.add('on');
+}
+function hideErr() { document.getElementById('errBox').classList.remove('on'); }
+
+function scoreColor(s) {
+  if (s >= 70) return 'var(--accent)';
+  if (s >= 45) return 'var(--warn)';
+  return 'var(--danger)';
+}
+
+function sentimentClass(s) {
+  s = (s||'').toLowerCase();
+  if (s.includes('posit') || s.includes('alta') || s.includes('compra') || s.includes('bull')) return 'pos';
+  if (s.includes('negat') || s.includes('baixa') || s.includes('venda') || s.includes('bear')) return 'neg';
+  return 'neu';
+}
+
+function recClass(r) {
+  r = (r||'').toLowerCase();
+  if (r.includes('compra') || r.includes('buy'))  return 'buy';
+  if (r.includes('venda') || r.includes('sell'))  return 'sell';
+  return 'hold';
+}
+
+function renderList(data) {
+  if (!data) return '—';
+  if (Array.isArray(data)) {
+    return '<ul>' + data.map(i => `<li>${i}</li>`).join('') + '</ul>';
+  }
+  // fallback: already a string
+  return data;
+}
+
+function renderNews(news) {
+  if (!news || !news.length) return '<p style="color:var(--muted);font-size:13px">Nenhuma notícia encontrada.</p>';
+  return news.map(n => {
+    const sc = sentimentClass(n.sentimento || '');
+    const tagLabel = sc === 'pos' ? 'POSITIVO' : sc === 'neg' ? 'NEGATIVO' : 'NEUTRO';
+    return `
+    <div class="news-item">
+      <div class="news-sentiment ${sc}"></div>
+      <div class="news-text">
+        <div class="news-headline">${n.titulo || ''}</div>
+        <div class="news-summary">${n.resumo || ''}</div>
+      </div>
+      <span class="news-tag ${sc}">${tagLabel}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderWatchlist(items) {
+  if (!items || !items.length) return '<p style="color:var(--muted);font-size:13px">—</p>';
+  return `<div class="watch-grid">${items.map(i => `
+    <div class="watch-item">
+      <div class="watch-event">${i.evento || ''}</div>
+      <div class="watch-date">${i.quando || ''}</div>
+    </div>`).join('')}</div>`;
+}
+
+function buildResult(d, ticker) {
+  const sc = parseInt(d.pontuacao) || 50;
+  const col = scoreColor(sc);
+  const rc = recClass(d.recomendacao || '');
+  const now = new Date().toLocaleString('pt-BR');
+
+  // sentiment bars
+  const bullPct = parseInt(d.sentimento_mercado?.percentual_otimistas) || 40;
+  const bearPct = parseInt(d.sentimento_mercado?.percentual_pessimistas) || 30;
+  const neutPct = 100 - bullPct - bearPct;
+
+  // trend arrow
+  const trend = (d.tendencia_tecnica?.direcao || 'Lateral').toLowerCase();
+  const tArrow = trend.includes('alta') ? '↗' : trend.includes('baixa') ? '↘' : '→';
+  const tColor = trend.includes('alta') ? 'var(--accent)' : trend.includes('baixa') ? 'var(--danger)' : 'var(--warn)';
+
+  return `
+  <div class="result-header anim">
+    <span class="ticker-badge">${ticker.toUpperCase()}</span>
+    <span class="ts">Análise gerada em ${now}</span>
+  </div>
+
+  <!-- TOP ROW: Recomendação + Score -->
+  <div class="top-row anim">
+    <div class="rec-card">
+      <div>
+        <div class="rec-title">Recomendação da IA</div>
+        <div class="rec-badge ${rc}">${(d.recomendacao || 'NEUTRO').toUpperCase()}</div>
+        <div class="rec-justification">${d.justificativa_recomendacao || ''}</div>
+      </div>
+      <div style="margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--muted)">${d.resumo_executivo || ''}</div>
+    </div>
+    <div class="score-card">
+      <div class="score-ring" style="border-color:${col}">
+        <span class="score-num" style="color:${col}">${sc}</span>
+        <span class="score-sub">/ 100</span>
+      </div>
+      <span class="score-label">Pontuação Geral</span>
+    </div>
+  </div>
+
+  <!-- SENTIMENTO + TENDÊNCIA + CONSENSO -->
+  <div class="sentiment-row anim">
+
+    <div class="sent-card">
+      <div class="sent-title"><span class="dot" style="background:var(--blue)"></span>Sentimento do Mercado</div>
+      <div class="sentiment-bar-wrap">
+        <div class="sbar-row"><span>Otimistas</span><span style="color:var(--accent)">${bullPct}%</span></div>
+        <div class="sbar" style="margin-bottom:8px"><div class="sbar-fill" style="width:${bullPct}%;background:var(--accent)"></div></div>
+        <div class="sbar-row"><span>Neutros</span><span style="color:var(--warn)">${neutPct}%</span></div>
+        <div class="sbar" style="margin-bottom:8px"><div class="sbar-fill" style="width:${neutPct}%;background:var(--warn)"></div></div>
+        <div class="sbar-row"><span>Pessimistas</span><span style="color:var(--danger)">${bearPct}%</span></div>
+        <div class="sbar"><div class="sbar-fill" style="width:${bearPct}%;background:var(--danger)"></div></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);line-height:1.5">${d.sentimento_mercado?.descricao || ''}</div>
+    </div>
+
+    <div class="sent-card">
+      <div class="sent-title"><span class="dot" style="background:var(--purple)"></span>Tendência Técnica</div>
+      <div class="trend-arrow" style="color:${tColor}">${tArrow}</div>
+      <div class="trend-label" style="color:${tColor}">${d.tendencia_tecnica?.direcao || 'Indefinida'}</div>
+      <div class="trend-desc">${d.tendencia_tecnica?.descricao || ''}</div>
+      <div style="margin-top:10px;font-size:11px;font-family:var(--mono);color:var(--muted)">${d.tendencia_tecnica?.indicadores || ''}</div>
+    </div>
+
+    <div class="sent-card">
+      <div class="sent-title"><span class="dot" style="background:var(--warn)"></span>Consenso de Analistas</div>
+      <div class="trend-label" style="color:var(--warn);margin-bottom:6px">${d.consenso_analistas?.veredicto || '—'}</div>
+      <div class="trend-desc">${d.consenso_analistas?.descricao || ''}</div>
+      <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.4">${d.consenso_analistas?.preco_alvo || ''}</div>
+    </div>
+
+  </div>
+
+  <!-- ESTRATÉGIAS: DIVIDENDOS vs TRADE -->
+  <div class="strat-row anim">
+
+    <div class="strat-card">
+      <div class="strat-header">
+        <span class="strat-icon">💰</span>
+        <div><div class="strat-name">Estratégia: Dividendos</div><div class="strat-sub">Foco em renda passiva</div></div>
+      </div>
+      <div class="strat-rec-label">Recomendação para dividendistas</div>
+      <div class="strat-rec-value" style="color:${recClass((d.estrategia_dividendos?.recomendacao||'')) === 'buy' ? 'var(--accent)' : recClass((d.estrategia_dividendos?.recomendacao||'')) === 'sell' ? 'var(--danger)' : 'var(--warn)'}">${d.estrategia_dividendos?.recomendacao || '—'}</div>
+      <div class="strat-body">${d.estrategia_dividendos?.analise || ''}</div>
+    </div>
+
+    <div class="strat-card">
+      <div class="strat-header">
+        <span class="strat-icon">⚡</span>
+        <div><div class="strat-name">Estratégia: Trade / Especulação</div><div class="strat-sub">Foco em valorização de capital</div></div>
+      </div>
+      <div class="strat-rec-label">Recomendação para traders</div>
+      <div class="strat-rec-value" style="color:${recClass((d.estrategia_trade?.recomendacao||'')) === 'buy' ? 'var(--accent)' : recClass((d.estrategia_trade?.recomendacao||'')) === 'sell' ? 'var(--danger)' : 'var(--warn)'}">${d.estrategia_trade?.recomendacao || '—'}</div>
+      <div class="strat-body">${d.estrategia_trade?.analise || ''}</div>
+    </div>
+
+  </div>
+
+  <!-- NOTÍCIAS -->
+  <div class="news-section anim">
+    <div class="section-title">Notícias recentes & impacto</div>
+    <div class="news-grid">${renderNews(d.noticias)}</div>
+  </div>
+
+  <!-- FUNDAMENTOS + RISCOS + CATALISADORES -->
+  <div class="main-grid anim">
+
+    <div class="info-card">
+      <div class="card-title"><span class="cdot" style="background:var(--accent)"></span>Fundamentos</div>
+      <div class="card-body">${renderList(d.fundamentos)}</div>
+    </div>
+
+    <div class="info-card">
+      <div class="card-title"><span class="cdot" style="background:var(--blue)"></span>Contexto Setorial</div>
+      <div class="card-body">${d.contexto_setor || '—'}</div>
+    </div>
+
+    <div class="info-card">
+      <div class="card-title"><span class="cdot" style="background:var(--danger)"></span>Riscos</div>
+      <div class="card-body">${renderList(d.riscos)}</div>
+    </div>
+
+    <div class="info-card">
+      <div class="card-title"><span class="cdot" style="background:var(--accent)"></span>Catalisadores</div>
+      <div class="card-body">${renderList(d.catalisadores)}</div>
+    </div>
+
+    <div class="info-card full">
+      <div class="card-title"><span class="cdot" style="background:var(--purple)"></span>O que Monitorar</div>
+      ${renderWatchlist(d.watchlist)}
+    </div>
+
+  </div>
+
+  <div class="disclaimer anim">
+    ⚠️ Esta análise é gerada por IA com base em dados públicos e não constitui recomendação formal de investimento. A IA pode cometer erros. Consulte um assessor financeiro certificado antes de tomar decisões. Rentabilidade passada não garante resultados futuros.
+  </div>`;
+}
+
+async function runAnalysis() {
+  const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+  const ctx    = document.getElementById('ctxInput').value.trim();
+  if (!ticker) { showErr('Digite o ticker do ativo.'); return; }
+
+  hideErr();
+  document.getElementById('resultWrap').classList.remove('on');
+  document.getElementById('goBtn').disabled = true;
+  document.getElementById('statusBar').classList.add('on');
+  startProgress();
+
+  const system = `Você é um analista financeiro sênior especializado no mercado de ações brasileiro (B3).
+Use web search para buscar dados atuais.
+
+REGRAS CRÍTICAS:
+- Responda APENAS com JSON puro, sem nenhum texto antes ou depois
+- Não use blocos de código markdown (sem \`\`\`json)
+- Nas strings do JSON use APENAS texto simples, NUNCA HTML, tags, aspas duplas internas ou caracteres especiais
+- Para listas de riscos e catalisadores, use arrays de strings simples
+- Seja conciso: cada string no máximo 120 caracteres
+
+JSON com esta estrutura exata (todos os campos são obrigatórios):
+{
+  "pontuacao": 65,
+  "recomendacao": "COMPRA",
+  "justificativa_recomendacao": "texto simples aqui",
+  "resumo_executivo": "texto simples aqui",
+  "sentimento_mercado": {
+    "percentual_otimistas": 55,
+    "percentual_pessimistas": 25,
+    "descricao": "texto simples aqui"
+  },
+  "tendencia_tecnica": {
+    "direcao": "Alta",
+    "descricao": "texto simples aqui",
+    "indicadores": "texto simples aqui"
+  },
+  "consenso_analistas": {
+    "veredicto": "texto simples aqui",
+    "descricao": "texto simples aqui",
+    "preco_alvo": "texto simples aqui"
+  },
+  "estrategia_dividendos": {
+    "recomendacao": "COMPRA GRADUAL",
+    "analise": "texto simples aqui"
+  },
+  "estrategia_trade": {
+    "recomendacao": "AGUARDAR CONFIRMACAO",
+    "analise": "texto simples aqui"
+  },
+  "noticias": [
+    { "titulo": "texto", "resumo": "texto", "sentimento": "positivo" },
+    { "titulo": "texto", "resumo": "texto", "sentimento": "negativo" },
+    { "titulo": "texto", "resumo": "texto", "sentimento": "neutro" }
+  ],
+  "fundamentos": [
+    "P/L: 5.2x",
+    "P/VP: 0.8x",
+    "DY: 9.1%",
+    "ROE: 18%",
+    "Divida/PL: 0.3x"
+  ],
+  "contexto_setor": "texto simples aqui",
+  "riscos": ["risco 1", "risco 2", "risco 3", "risco 4"],
+  "catalisadores": ["catalisador 1", "catalisador 2", "catalisador 3"],
+  "watchlist": [
+    { "evento": "Divulgacao de resultados", "quando": "Ago/2025" },
+    { "evento": "Pagamento de dividendos", "quando": "Jul/2025" }
+  ]
+}`;
+
+  const userMsg = `Analise o ativo ${ticker} na B3 de forma completa e atual.
+${ctx ? `\nContexto do investidor: ${ctx}` : ''}
+
+Pesquise:
+1. Cotação e fundamentos atuais (P/L, P/VP, DY, ROE, dívida)
+2. Últimas notícias relevantes (últimas semanas/meses)
+3. Sentimento atual do mercado sobre o ativo
+4. Tendência técnica (médias móveis, RSI, volume)
+5. Consenso de analistas e preço-alvo
+6. Análise específica para dividendistas (DY histórico, payout, regularidade)
+7. Análise específica para traders (volatilidade, momentum, setup)
+8. Riscos e catalisadores principais
+9. Calendário de eventos importantes (resultados, pagamento de JCP/dividendos, etc)`;
+
+  // =====================================================================
+  // PROXY URL — substitua pelo endereço do seu Cloudflare Worker
+  // Veja as instruções no arquivo LEIA-ME-PROXY.md
+  // =====================================================================
+  const PROXY_URL = "https://SEU-WORKER.SEU-USUARIO.workers.dev";
+
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4000,
+        system,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content: userMsg }]
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error.message || 'Erro na API');
+
+    const raw = (data.content || [])
+      .map(i => i.type === 'text' ? i.text : '')
+      .filter(Boolean)
+      .join('\n');
+
+    // Strip markdown code fences
+    let clean = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+    // Extract the JSON object
+    const start = clean.indexOf('{');
+    const end   = clean.lastIndexOf('}');
+    if (start === -1 || end === -1) throw new Error('A IA não retornou JSON válido. Tente novamente.');
+
+    const jsonStr = clean.slice(start, end + 1);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch(parseErr) {
+      // Attempt to salvage by removing trailing incomplete entries
+      const truncated = jsonStr.replace(/,\s*\{[^}]*$/, '').replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
+      try {
+        // Try closing open structures
+        const fixed = truncated + (truncated.match(/\[/) && !truncated.match(/\]$/) ? ']' : '') + '}';
+        parsed = JSON.parse(fixed);
+      } catch {
+        throw new Error(`JSON inválido: ${parseErr.message}. Tente novamente.`);
+      }
+    }
+
+    stopProgress();
+    const wrap = document.getElementById('resultWrap');
+    wrap.innerHTML = buildResult(parsed, ticker);
+    wrap.classList.add('on');
+
+  } catch(e) {
+    stopProgress();
+    showErr(`Erro: ${e.message}`);
+    console.error(e);
+  }
+
+  document.getElementById('goBtn').disabled = false;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('tickerInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runAnalysis();
+  });
+});
+</script>
+</body>
+</html>
