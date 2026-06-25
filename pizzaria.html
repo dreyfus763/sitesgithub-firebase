@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Relatório Pizzaria</title>
-<!-- versão corrigida v3: estado normalizado, clique protegido e fallback local -->
+<!-- versão corrigida v4: editFunc/editItem/editDevia expostas em window + step do caixa ajustado -->
 <!-- Firebase via REST: sem SDK externo, app abre mesmo offline -->
 
 <style>
@@ -131,13 +131,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="sec-hdr"><div class="sec-title">💰 Caixa</div></div>
         <div class="sec-body">
           <div class="row2" style="margin-bottom:10px;">
-            <div class="fg"><label>Caixa Inicial (R$)</label><input type="number" id="cx-ini" placeholder="0,00" step="0.01" oninput="autoSave()"/></div>
-            <div class="fg"><label>Caixa Final (R$)</label><input type="number" id="cx-fin" placeholder="0,00" step="0.01" oninput="autoSave()"/></div>
+            <div class="fg"><label>Caixa Inicial (R$)</label><input type="number" id="cx-ini" placeholder="0,00" step="1" oninput="autoSave()"/></div>
+            <div class="fg"><label>Caixa Final (R$)</label><input type="number" id="cx-fin" placeholder="0,00" step="1" oninput="autoSave()"/></div>
           </div>
           <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">DEPÓSITOS DO DIA</div>
           <div id="dep-list"></div>
           <div class="row2" style="margin-top:6px;">
-            <div class="fg"><label>Valor (R$)</label><input type="number" id="dep-val" placeholder="ex: 1500" step="0.01"/></div>
+            <div class="fg"><label>Valor (R$)</label><input type="number" id="dep-val" placeholder="ex: 1500" step="1"/></div>
             <div class="fg"><label>Quem fez</label><input type="text" id="dep-quem" placeholder="ex: Gustavo"/></div>
           </div>
           <div class="btn-row"><button class="btn btn-orange" onclick="addDep()">+ Depósito</button></div>
@@ -252,13 +252,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="sec-hdr"><div class="sec-title">💰 Caixa</div></div>
         <div class="sec-body">
           <div class="row2" style="margin-bottom:10px;">
-            <div class="fg"><label>Caixa Inicial (R$)</label><input type="number" id="ecx-ini" placeholder="0,00" step="0.01" oninput="editAutoSave()"/></div>
-            <div class="fg"><label>Caixa Final (R$)</label><input type="number" id="ecx-fin" placeholder="0,00" step="0.01" oninput="editAutoSave()"/></div>
+            <div class="fg"><label>Caixa Inicial (R$)</label><input type="number" id="ecx-ini" placeholder="0,00" step="1" oninput="editAutoSave()"/></div>
+            <div class="fg"><label>Caixa Final (R$)</label><input type="number" id="ecx-fin" placeholder="0,00" step="1" oninput="editAutoSave()"/></div>
           </div>
           <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">DEPÓSITOS</div>
           <div id="edep-list"></div>
           <div class="row2" style="margin-top:6px;">
-            <div class="fg"><label>Valor (R$)</label><input type="number" id="edep-val" placeholder="ex: 1500" step="0.01"/></div>
+            <div class="fg"><label>Valor (R$)</label><input type="number" id="edep-val" placeholder="ex: 1500" step="1"/></div>
             <div class="fg"><label>Quem fez</label><input type="text" id="edep-quem" placeholder="ex: Gustavo"/></div>
           </div>
           <div class="btn-row"><button class="btn btn-orange" onclick="eAddDep()">+ Depósito</button></div>
@@ -634,10 +634,14 @@ async function abrirRelatorio() {
   showPage('page-rel');
   switchTab('anotar');
 
-  // Carrega do Firebase em background e atualiza se vier dado diferente
+  // Carrega do Firebase em background. Só re-renderiza se o conteúdo
+  // realmente mudou em relação ao cache já exibido — caso contrário, um
+  // segundo render() reconstrói o innerHTML dos cards bem no momento em
+  // que o usuário pode estar clicando no botão ✏️, e o clique se perde
+  // porque o elemento clicado é substituído antes do evento ser processado.
   if(window._load) {
     window._load(currentDate).then(data => {
-      if(data) {
+      if(data && JSON.stringify(normalizeState(data)) !== JSON.stringify(normalizeState(state))) {
         state = cloneState(data);
         document.getElementById('cx-ini').value = state.cxIni||'';
         document.getElementById('cx-fin').value = state.cxFin||'';
@@ -752,7 +756,6 @@ function eRemDep(i){editState.depositos.splice(i,1);eRenderDep();editSave();}
 
 // ===== FUNCIONÁRIOS =====
 function funcCard(f, i, ctx) {
-  const pref = ctx==='edit'?'e':'';
   const turnos=(f.turnos||[]).filter(t=>t.ent||t.sai).map(t=>`${t.ent} - ${t.sai}`).join(' | ');
   let linha=turnos;
   if(f.consumo&&f.turnos&&f.turnos.length===1) linha=`${f.turnos[0].ent} - ${f.consumo} - ${f.turnos[0].sai}`;
@@ -768,8 +771,8 @@ function funcCard(f, i, ctx) {
         ${pag}${obs}
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0;">
-        <button onclick="${pref}EditFunc(${i})" class="btn btn-gray" style="padding:4px 8px;font-size:11px;">✏️</button>
-        <button onclick="${pref}RemFunc(${i})" class="btn btn-red" style="padding:4px 8px;font-size:11px;">✕</button>
+        <button onclick="${ctx==='edit'?'eEditFunc':'editFunc'}(${i})" class="btn btn-gray" style="padding:4px 8px;font-size:11px;">✏️</button>
+        <button onclick="${ctx==='edit'?'eRemFunc':'remFunc'}(${i})" class="btn btn-red" style="padding:4px 8px;font-size:11px;">✕</button>
       </div>
     </div>
   </div>`;
@@ -848,14 +851,13 @@ function salvarFunc(){
 
 // ===== VENDAS / DESPESAS =====
 function itemCard(it,i,tipo,ctx){
-  const pref=ctx==='edit'?'e':'';
   const platInfo=tipo==='venda'?`<div class="item-plat">${escapeHTML(it.plat)}</div>`:'';
   return `<div class="item-card">
     <div class="item-left"><div class="item-desc">${escapeHTML(it.desc)}</div>${platInfo}</div>
     <div class="item-val" style="color:${tipo==='venda'?'var(--green)':'var(--red)'};">R$ ${fmt(it.val)}</div>
     <div class="item-actions">
-      <button onclick="${pref}EditItem('${tipo}',${i})" class="btn btn-gray" style="padding:3px 7px;font-size:11px;">✏️</button>
-      <button onclick="${pref}RemItem('${tipo}',${i})" class="btn btn-red" style="padding:3px 7px;font-size:11px;">✕</button>
+      <button onclick="${ctx==='edit'?'eEditItem':'editItem'}('${tipo}',${i})" class="btn btn-gray" style="padding:3px 7px;font-size:11px;">✏️</button>
+      <button onclick="${ctx==='edit'?'eRemItem':'remItem'}('${tipo}',${i})" class="btn btn-red" style="padding:3px 7px;font-size:11px;">✕</button>
     </div>
   </div>`;
 }
@@ -902,7 +904,6 @@ function eRemItem(tipo,i){if(tipo==='venda')editState.vendas.splice(i,1);else ed
 
 // ===== DEVIAS =====
 function deviaCard(d,i,ctx){
-  const pref=ctx==='edit'?'e':'';
   return `<div class="devia-card">
     <div>
       <div style="font-weight:700;font-size:13px;">${escapeHTML(d.nome)}</div>
@@ -910,8 +911,8 @@ function deviaCard(d,i,ctx){
       ${d.det?`<div style="font-size:12px;color:var(--muted);">${escapeHTML(d.det)}</div>`:''}
     </div>
     <div style="display:flex;gap:5px;flex-shrink:0;">
-      <button onclick="${pref}EditDevia(${i})" class="btn btn-gray" style="padding:3px 7px;font-size:11px;">✏️</button>
-      <button onclick="${pref}RemDevia(${i})" class="btn btn-red" style="padding:3px 7px;font-size:11px;">✕</button>
+      <button onclick="${ctx==='edit'?'eEditDevia':'editDevia'}(${i})" class="btn btn-gray" style="padding:3px 7px;font-size:11px;">✏️</button>
+      <button onclick="${ctx==='edit'?'eRemDevia':'remDevia'}(${i})" class="btn btn-red" style="padding:3px 7px;font-size:11px;">✕</button>
     </div>
   </div>`;
 }
@@ -1059,6 +1060,9 @@ window.editItem=editItem;window.eEditItem=eEditItem;
 window.remItem=remItem;window.eRemItem=eRemItem;window.salvarItem=salvarItem;
 window.abrirModalDevia=abrirModalDevia;window.eAbrirModalDevia=eAbrirModalDevia;
 window.editDevia=editDevia;window.eEditDevia=eEditDevia;
+// Nota: editFunc/editItem/editDevia já são as funções referenciadas pelos onclick
+// dos cards na tela "Anotar" — precisam estar expostas em window, assim como
+// suas versões "e" (edit) já estavam, para que o clique funcione nesse fluxo.
 window.remDevia=remDevia;window.eRemDevia=eRemDevia;window.salvarDevia=salvarDevia;
 window.copiarSecao=copiarSecao;window.copiarTudo=copiarTudo;window.copiarVer=copiarVer;
 window.verDia=verDia;window.editarDia=editarDia;window.fecharModal=fecharModal;
