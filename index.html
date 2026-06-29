@@ -19,7 +19,7 @@
   };
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
-  let registros = [], meta = 0, custoKm = 0.20;
+  let registros = [], meta = 0, custoKm = 0.20, diaVenc = 20, metaDiaria = 80;
   function setStatus(msg, color) {
     const el = document.getElementById('cloud-status');
     if (el) { el.textContent = msg; el.style.color = color; }
@@ -33,23 +33,33 @@
         registros = Array.isArray(d.registros) ? d.registros : [];
         meta = d.meta || 0;
         custoKm = d.custoKm || 0.20;
+        diaVenc = d.diaVenc || 20;
+        metaDiaria = d.metaDiaria != null ? d.metaDiaria : 80;
       }
       setStatus('☁️ Sincronizado', '#1D9E75');
     } catch(e) { setStatus('⚠️ Sem conexão', '#f59e0b'); }
     document.getElementById('inp-meta').value = meta || '';
     document.getElementById('inp-custo-km').value = custoKm;
+    document.getElementById('inp-dia-venc').value = diaVenc;
+    document.getElementById('inp-meta-diaria').value = metaDiaria;
+    window._diaVenc = diaVenc;
+    window._metaDiaria = metaDiaria;
     atualizar();
   }
   async function saveData() {
     setStatus('Salvando...', '#aaa');
     try {
-      await set(ref(db, 'motorista'), { registros, meta, custoKm });
+      await set(ref(db, 'motorista'), { registros, meta, custoKm, diaVenc, metaDiaria });
       setStatus('☁️ Sincronizado', '#1D9E75');
     } catch(e) { setStatus('⚠️ Erro ao salvar', '#E24B4A'); }
   }
   window._save = saveData;
-  window._getData = () => ({ registros, meta, custoKm });
-  window._setData = (r, m, c) => { registros = r; meta = m; custoKm = c; };
+  window._getData = () => ({ registros, meta, custoKm, diaVenc, metaDiaria });
+  window._setData = (r, m, c, dv, md) => {
+    registros = r; meta = m; custoKm = c;
+    if (dv != null) diaVenc = dv;
+    if (md != null) metaDiaria = md;
+  };
   loadData();
 </script>
 <style>
@@ -161,6 +171,38 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 .alert-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
 .alert-ok { background: var(--green-light); color: #065f46; border: 1px solid rgba(29,158,117,0.3); }
 @media(max-width:480px){ .form-grid{grid-template-columns:1fr;} .metrics{grid-template-columns:1fr 1fr;} .semana-dias{grid-template-columns:repeat(4,1fr);} }
+
+/* ===== Redesign Resumo: estilo "app de banco" ===== */
+.hero-meta { background: var(--surface); border-radius: 16px; padding: 20px; margin-bottom: 16px; border: 1px solid var(--border); }
+.hero-meta .hero-eyebrow { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+.hero-meta .hero-value { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.hero-meta .hero-value.is-done { color: var(--green); }
+.hero-meta .hero-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.hero-meta .hero-bar-track { background: var(--border); border-radius: 99px; height: 6px; overflow: hidden; margin: 16px 0 8px; }
+.hero-meta .hero-bar-fill { height: 6px; border-radius: 99px; transition: width 0.5s; }
+.hero-meta .hero-foot { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); }
+.hero-meta .hero-foot strong { color: var(--text); font-weight: 600; }
+
+.daily-strip { display:flex; align-items:center; gap:14px; padding: 12px 16px; background: var(--surface); border-radius: 14px; border: 1px solid var(--border); margin-bottom: 16px; }
+.daily-strip .ds-icon { font-size: 20px; flex-shrink:0; }
+.daily-strip .ds-body { flex:1; min-width:0; }
+.daily-strip .ds-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.daily-strip .ds-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.daily-strip .ds-value { font-size: 15px; font-weight: 700; text-align:right; flex-shrink:0; }
+.daily-strip.ds-warn { border-color: rgba(226,75,74,0.35); background: var(--red-light); }
+.daily-strip.ds-warn .ds-value { color: var(--red); }
+.daily-strip.ds-ok .ds-value { color: var(--green); }
+
+.group-card { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); padding: 4px 16px; margin-bottom: 16px; }
+.row-line { display:flex; justify-content:space-between; align-items:baseline; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 10px; }
+.row-line:last-child { border-bottom: none; }
+.row-line .rl-label { font-size: 13px; color: var(--muted); }
+.row-line .rl-value { font-size: 14px; font-weight: 700; color: var(--text); text-align:right; display:flex; flex-direction:column; align-items:flex-end; }
+.row-line .rl-value .rl-sub { font-size: 11px; font-weight: 500; color: var(--muted); margin-top:1px; }
+.row-line.rl-highlight .rl-value { color: var(--green); }
+.row-line.rl-highlight-red .rl-value { color: var(--red); }
+
+.group-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 8px 2px; }
 </style>
 </head>
 <body>
@@ -194,36 +236,55 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div style="text-align:right;font-size:12px;opacity:0.85;" id="today-detail"></div>
     </div>
     <div id="alert-banner" class="alert-banner" style="display:none;"></div>
-    <div class="section-title">Meta mensal</div>
-    <div class="meta-card">
-      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text);">
-        <span id="meta-label">—</span><span id="meta-pct" style="font-weight:700;">0%</span>
+
+    <!-- HERO: meta do ciclo -->
+    <div class="hero-meta">
+      <div class="hero-eyebrow">Faltam para a meta · vence <span id="hero-venc-dia">dia 20</span></div>
+      <div class="hero-value" id="hero-faltam">—</div>
+      <div class="hero-sub" id="hero-sub">—</div>
+      <div class="hero-bar-track"><div class="hero-bar-fill" id="meta-fill" style="width:0%;background:var(--green);"></div></div>
+      <div class="hero-foot">
+        <span><strong id="meta-label-val">—</strong> de <span id="meta-label-total">—</span></span>
+        <span id="meta-pct">0%</span>
       </div>
-      <div class="meta-bar-track"><div class="meta-bar-fill" id="meta-fill" style="width:0%;background:var(--green);"></div></div>
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);">
-        <span id="meta-faltam"></span><span id="meta-dias-necessarios"></span>
+      <div class="hero-foot" style="margin-top:6px;">
+        <span id="meta-periodo"></span>
       </div>
     </div>
-    <div class="section-title">Mês atual</div>
-    <div class="metrics">
-      <div class="metric"><div class="metric-label">Lucro líquido</div><div class="metric-value" id="m-liquido">—</div><div class="metric-sub">após custos</div></div>
-      <div class="metric"><div class="metric-label">Lucro bruto</div><div class="metric-value" id="m-bruto">—</div></div>
-      <div class="metric"><div class="metric-label">Custo km</div><div class="metric-value" id="m-custo">—</div><div class="metric-sub" id="custo-km-label">R$ 0,20/km</div></div>
-      <div class="metric"><div class="metric-label">KM rodados</div><div class="metric-value" id="m-km">—</div></div>
-      <div class="metric"><div class="metric-label">Horas</div><div class="metric-value" id="m-horas">—</div></div>
-      <div class="metric"><div class="metric-label">Ganho/hora</div><div class="metric-value" id="m-porhora">—</div><div class="metric-sub">líquido</div></div>
+
+    <!-- Faixa: meta diária R$80 -->
+    <div class="daily-strip" id="daily-strip">
+      <div class="ds-icon" id="ds-icon">📅</div>
+      <div class="ds-body">
+        <div class="ds-title" id="md-necessario-sub2">Meta diária</div>
+        <div class="ds-sub" id="md-dias-sub">—</div>
+      </div>
+      <div class="ds-value" id="md-necessario">—</div>
     </div>
-    <div class="section-title">Projeção</div>
-    <div class="metrics" style="margin-bottom:14px;">
-      <div class="metric"><div class="metric-label">Projeção mês</div><div class="metric-value" id="proj-val">—</div><div class="metric-sub">no ritmo atual</div></div>
-      <div class="metric"><div class="metric-label">Dias trabalhados</div><div class="metric-value" id="proj-dias">—</div><div class="metric-sub" id="proj-restam"></div></div>
-      <div class="metric"><div class="metric-label">Média/dia</div><div class="metric-value" id="proj-media">—</div><div class="metric-sub">líquido</div></div>
+
+    <div class="group-title">Mês atual</div>
+    <div class="group-card">
+      <div class="row-line"><span class="rl-label">Lucro líquido</span><span class="rl-value"><span id="m-liquido">—</span><span class="rl-sub">após custos</span></span></div>
+      <div class="row-line"><span class="rl-label">Lucro bruto</span><span class="rl-value" id="m-bruto">—</span></div>
+      <div class="row-line"><span class="rl-label">Custo km</span><span class="rl-value"><span id="m-custo">—</span><span class="rl-sub" id="custo-km-label">R$ 0,20/km</span></span></div>
+      <div class="row-line"><span class="rl-label">KM rodados</span><span class="rl-value" id="m-km">—</span></div>
+      <div class="row-line"><span class="rl-label">Horas trabalhadas</span><span class="rl-value" id="m-horas">—</span></div>
+      <div class="row-line"><span class="rl-label">Ganho por hora</span><span class="rl-value"><span id="m-porhora">—</span><span class="rl-sub">líquido</span></span></div>
     </div>
-    <div class="section-title">Destaques</div>
-    <div class="metrics" style="margin-bottom:14px;">
-      <div class="metric highlight"><div class="metric-label">🏆 Melhor dia</div><div class="metric-value" id="best-val">—</div><div class="metric-sub" id="best-date"></div></div>
-      <div class="metric highlight-red"><div class="metric-label">📉 Pior dia</div><div class="metric-value" id="worst-val">—</div><div class="metric-sub" id="worst-date"></div></div>
+
+    <div class="group-title">Projeção</div>
+    <div class="group-card">
+      <div class="row-line"><span class="rl-label">Projeção do mês</span><span class="rl-value"><span id="proj-val">—</span><span class="rl-sub">no ritmo atual</span></span></div>
+      <div class="row-line"><span class="rl-label">Dias trabalhados</span><span class="rl-value"><span id="proj-dias">—</span><span class="rl-sub" id="proj-restam"></span></span></div>
+      <div class="row-line"><span class="rl-label">Média por dia</span><span class="rl-value"><span id="proj-media">—</span><span class="rl-sub">líquido</span></span></div>
     </div>
+
+    <div class="group-title">Destaques</div>
+    <div class="group-card">
+      <div class="row-line rl-highlight"><span class="rl-label">🏆 Melhor dia</span><span class="rl-value"><span id="best-val">—</span><span class="rl-sub" id="best-date"></span></span></div>
+      <div class="row-line rl-highlight-red"><span class="rl-label">📉 Pior dia</span><span class="rl-value"><span id="worst-val">—</span><span class="rl-sub" id="worst-date"></span></span></div>
+    </div>
+
     <div class="section-title">Lucro líquido por dia (mês atual)</div>
     <div class="chart-wrap"><canvas id="chartMes"></canvas></div>
     <div class="btn-row" style="margin-top:14px;">
@@ -322,12 +383,30 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
   <!-- CONFIG -->
   <div id="tab-config" class="panel">
     <div class="card">
-      <div class="card-title">Meta mensal (R$)</div>
+      <div class="card-title">Meta do ciclo (R$)</div>
       <div class="form-group" style="max-width:240px;">
-        <label>Lucro líquido alvo</label>
-        <input type="number" id="inp-meta" placeholder="ex: 3000" min="0" step="100" />
+        <label>Valor da parcela / meta</label>
+        <input type="number" id="inp-meta" placeholder="ex: 2223" min="0" step="100" />
       </div>
       <div class="btn-row"><button class="btn btn-primary" onclick="salvarMeta()">Salvar</button></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Dia de vencimento do ciclo</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">O ciclo da meta vai do dia de vencimento até o dia anterior do mês seguinte (ex: vencimento dia 20 → ciclo de 21/mês a 20/mês seguinte... ajustável abaixo).</p>
+      <div class="form-group" style="max-width:240px;">
+        <label>Dia do mês que vence (pagamento)</label>
+        <input type="number" id="inp-dia-venc" placeholder="ex: 20" min="1" max="28" step="1" />
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="salvarDiaVenc()">Salvar</button></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Meta diária mínima (R$)</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Usada para calcular o déficit acumulado e o quanto falta por dia, considerando todos os 7 dias da semana.</p>
+      <div class="form-group" style="max-width:240px;">
+        <label>Mínimo líquido por dia</label>
+        <input type="number" id="inp-meta-diaria" placeholder="ex: 80" min="0" step="5" />
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="salvarMetaDiaria()">Salvar</button></div>
     </div>
     <div class="card">
       <div class="card-title">Custo por km (R$)</div>
@@ -380,7 +459,12 @@ function toggleDark() {
 let semanaOffset = 0;
 const charts = { mes: null, diaSem: null, meses: null };
 
-function getD() { return window._getData ? window._getData() : { registros:[], meta:0, custoKm:0.20 }; }
+function getD() { return window._getData ? window._getData() : { registros:[], meta:0, custoKm:0.20, diaVenc:20, metaDiaria:80 }; }
+
+// ---- Config extra: dia de vencimento e meta diária (vêm do Firebase junto com o resto) ----
+function getDiaVenc() { const{diaVenc}=getD(); return diaVenc!=null ? diaVenc : 20; }
+function getMetaDiaria() { const{metaDiaria}=getD(); return metaDiaria!=null ? metaDiaria : 80; }
+
 function fmt(n) { return 'R$ ' + (isNaN(n)||n==null?0:n).toFixed(2).replace('.', ','); }
 function fmtData(d) { if(!d) return ''; const [y,m,dia] = d.split('-'); return `${dia}/${m}/${y}`; }
 function mesAtual() { return today.slice(0,7); }
@@ -388,6 +472,35 @@ function agruparPorData(lista) {
   const m = {};
   lista.forEach(r => { m[r.data] = (m[r.data]||0) + r.liquido; });
   return m;
+}
+
+// ---- Ciclo da meta (ex: vence dia 20 -> ciclo de 21 do mês anterior até dia 20 do mês atual) ----
+function dataToISO(d) { return d.toISOString().split('T')[0]; }
+function getCicloAtual(refDateStr, diaVenc) {
+  // refDateStr = 'YYYY-MM-DD'. O ciclo TERMINA no dia de vencimento (inclusive).
+  // Início do ciclo = (diaVenc+1) do mês anterior ao mês de término, se hoje <= diaVenc do mês atual,
+  // senão o ciclo atual termina no diaVenc do mês seguinte.
+  const [y,m,d] = refDateStr.split('-').map(Number);
+  const ref = new Date(y, m-1, d, 12);
+  let fim, inicio;
+  if (ref.getDate() <= diaVenc) {
+    fim = new Date(y, m-1, diaVenc, 12);
+    inicio = new Date(y, m-2, diaVenc+1, 12);
+  } else {
+    fim = new Date(y, m, diaVenc, 12);
+    inicio = new Date(y, m-1, diaVenc+1, 12);
+  }
+  return { inicio: dataToISO(inicio), fim: dataToISO(fim) };
+}
+function diasNoIntervalo(iniISO, fimISO) {
+  const ini = new Date(iniISO+'T12:00:00');
+  const fim = new Date(fimISO+'T12:00:00');
+  return Math.round((fim-ini)/86400000)+1;
+}
+function listaDatasIntervalo(iniISO, fimISO) {
+  const out=[]; const ini=new Date(iniISO+'T12:00:00'); const fim=new Date(fimISO+'T12:00:00');
+  for(let d=new Date(ini); d<=fim; d.setDate(d.getDate()+1)) out.push(dataToISO(d));
+  return out;
 }
 
 function atualizarTurno() {
@@ -414,6 +527,8 @@ atualizarTurno();
 
 function atualizar() {
   const { registros, meta, custoKm } = getD();
+  const diaVenc = getDiaVenc();
+  const metaDiaria = getMetaDiaria();
   const lista = registros.filter(r => r.data.startsWith(mesAtual()));
   const porData = agruparPorData(registros);
   const porDataMes = agruparPorData(lista);
@@ -432,6 +547,81 @@ function atualizar() {
   const diasRestantes = diasNoMes - diaAtual;
   const projecao = mediaDiaria * diasNoMes;
 
+  // ===== CICLO DA META (vence todo dia X) =====
+  const ciclo = getCicloAtual(today, diaVenc);
+  const totalDiasCiclo = diasNoIntervalo(ciclo.inicio, ciclo.fim);
+  const datasCicloAteHoje = listaDatasIntervalo(ciclo.inicio, today); // inclui hoje
+  const diasDecorridos = datasCicloAteHoje.length;
+  const diasRestantesCiclo = totalDiasCiclo - diasDecorridos;
+  const liquidoCiclo = registros.filter(r=>r.data>=ciclo.inicio && r.data<=ciclo.fim)
+                                  .reduce((s,r)=>s+r.liquido,0);
+  const faltaMeta = meta - liquidoCiclo;
+  const pctCiclo = meta>0 ? Math.min(100,(liquidoCiclo/meta)*100) : 0;
+
+  // HERO: faltam X para a meta
+  document.getElementById('hero-venc-dia').textContent = `dia ${diaVenc}`;
+  const heroFaltam = document.getElementById('hero-faltam');
+  const heroSub = document.getElementById('hero-sub');
+  if (meta<=0) {
+    heroFaltam.textContent = 'Configure sua meta';
+    heroFaltam.classList.remove('is-done');
+    heroSub.textContent = 'Defina o valor em Config para acompanhar o ciclo.';
+  } else if (faltaMeta<=0) {
+    heroFaltam.textContent = '🎉 Meta batida!';
+    heroFaltam.classList.add('is-done');
+    heroSub.textContent = `Você fechou o ciclo com ${fmt(liquidoCiclo)}.`;
+  } else {
+    heroFaltam.textContent = fmt(faltaMeta);
+    heroFaltam.classList.remove('is-done');
+    if (diasRestantesCiclo>0) {
+      heroSub.textContent = `≈ ${fmt(faltaMeta/diasRestantesCiclo)}/dia nos ${diasRestantesCiclo} dia(s) restantes`;
+    } else {
+      heroSub.textContent = '⚠️ ciclo encerrado sem bater a meta';
+    }
+  }
+  document.getElementById('meta-fill').style.width = pctCiclo.toFixed(1)+'%';
+  document.getElementById('meta-fill').style.background = pctCiclo>=100?'var(--green)':pctCiclo>=70?'var(--yellow)':'var(--green)';
+  document.getElementById('meta-pct').textContent = pctCiclo.toFixed(0)+'%';
+  document.getElementById('meta-label-val').textContent = fmt(liquidoCiclo);
+  document.getElementById('meta-label-total').textContent = fmt(meta);
+  document.getElementById('meta-periodo').textContent =
+    `Ciclo ${fmtData(ciclo.inicio)} – ${fmtData(ciclo.fim)} · dia ${diasDecorridos} de ${totalDiasCiclo}`;
+
+  // ===== META DIÁRIA (R$80/dia, considerando TODOS os dias do ciclo, mesmo sem registro) =====
+  let deficit = 0; // soma do que faltou em dias que ficaram abaixo do mínimo (incluindo dias sem registro = déficit total do dia)
+  datasCicloAteHoje.forEach(d => {
+    const liqDia = porData[d] || 0;
+    if (liqDia < metaDiaria) {
+      deficit += (metaDiaria - liqDia);
+    }
+  });
+  const diasComDeficit = datasCicloAteHoje.filter(d => (porData[d]||0) < metaDiaria).length;
+  const dailyStrip = document.getElementById('daily-strip');
+  const dsIcon = document.getElementById('ds-icon');
+  const dsTitle = document.getElementById('md-necessario-sub2');
+  const dsSub = document.getElementById('md-dias-sub');
+  const dsValue = document.getElementById('md-necessario');
+  dsSub.textContent = `${diasComDeficit} de ${diasDecorridos} dia(s) abaixo de ${fmt(metaDiaria)}`;
+  dailyStrip.classList.remove('ds-warn','ds-ok');
+  if (diasRestantesCiclo > 0) {
+    const necessarioAgora = (metaDiaria * Math.max(0,diasRestantesCiclo)) + deficit;
+    const necessarioPorDiaMin = necessarioAgora / Math.max(1,diasRestantesCiclo);
+    dsValue.textContent = fmt(necessarioPorDiaMin)+'/dia';
+    if (deficit>0) {
+      dsIcon.textContent='⚠️';
+      dsTitle.textContent=`Déficit de ${fmt(deficit)} nos R$${metaDiaria.toFixed(0)}/dia`;
+      dailyStrip.classList.add('ds-warn');
+    } else {
+      dsIcon.textContent='✅';
+      dsTitle.textContent='Em dia com a meta diária';
+      dailyStrip.classList.add('ds-ok');
+    }
+  } else {
+    dsValue.textContent = deficit>0 ? '⚠️ déficit' : '✅ ok';
+    dsTitle.textContent = 'Ciclo encerrado';
+    if (deficit>0) dailyStrip.classList.add('ds-warn'); else dailyStrip.classList.add('ds-ok');
+  }
+
   // hoje
   const todayReg = registros.filter(r=>r.data===today);
   const todayLiq = todayReg.reduce((s,r)=>s+r.liquido,0);
@@ -442,24 +632,32 @@ function atualizar() {
   if (todayReg.length > 0) {
     banner.style.display='flex';
     document.getElementById('today-val').textContent = fmt(todayLiq);
-    document.getElementById('today-sub').textContent = `${todayHoras.toFixed(1).replace('.',',')}h · ${todayKm} km`;
+    document.getElementById('today-sub').textContent = `${todayHoras.toFixed(1).replace('.',',')}h · ${todayKm.toFixed(0)} km`;
     document.getElementById('today-detail').textContent = `Bruto: ${fmt(todayBruto)}`;
   } else { banner.style.display='none'; }
 
-  // alerta de ritmo
+  // alerta de ritmo (baseado no ciclo da meta agora, não no mês civil)
   const alertBanner = document.getElementById('alert-banner');
-  if (meta > 0 && diasTrabalhados > 0) {
-    const necessarioPorDia = (meta - totalLiquido) / Math.max(1, diasRestantes);
-    const alertBanner = document.getElementById('alert-banner');
-    if (mediaDiaria < necessarioPorDia * 0.8) {
+  if (meta > 0 && diasDecorridos > 0) {
+    const necessarioPorDiaCiclo = diasRestantesCiclo>0 ? (faltaMeta>0 ? faltaMeta/diasRestantesCiclo : 0) : 0;
+    const mediaDiariaCiclo = liquidoCiclo / diasDecorridos;
+    if (deficit > 0) {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-warn';
-      alertBanner.textContent = `⚠️ Ritmo abaixo do necessário. Você precisa de ${fmt(necessarioPorDia)}/dia pelos próximos ${diasRestantes} dias para bater a meta. Sua média atual é ${fmt(mediaDiaria)}/dia.`;
-    } else if (projecao >= meta) {
+      alertBanner.textContent = `⚠️ Você está com ${fmt(deficit)} de déficit nos R$${metaDiaria.toFixed(0)}/dia. Para zerar e ainda bater a meta de ${fmt(meta)}, precisa de ${diasRestantesCiclo>0?fmt((metaDiaria*diasRestantesCiclo+deficit)/Math.max(1,diasRestantesCiclo)):'—'}/dia até ${fmtData(ciclo.fim)}.`;
+    } else if (faltaMeta <= 0) {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-ok';
-      alertBanner.textContent = `✅ No ritmo certo! Projeção de ${fmt(projecao)} — acima da meta de ${fmt(meta)}.`;
-    } else { alertBanner.style.display='none'; }
+      alertBanner.textContent = `✅ Meta do ciclo batida! ${fmt(liquidoCiclo)} de ${fmt(meta)} — vencimento ${fmtData(ciclo.fim)}.`;
+    } else if (mediaDiariaCiclo*totalDiasCiclo >= meta) {
+      alertBanner.style.display='block';
+      alertBanner.className='alert-banner alert-ok';
+      alertBanner.textContent = `✅ No ritmo certo para a meta de ${fmt(meta)} até ${fmtData(ciclo.fim)}.`;
+    } else {
+      alertBanner.style.display='block';
+      alertBanner.className='alert-banner alert-warn';
+      alertBanner.textContent = `⚠️ Faltam ${fmt(faltaMeta)} para a meta. Necessário ≈ ${fmt(necessarioPorDiaCiclo)}/dia até ${fmtData(ciclo.fim)}.`;
+    }
   } else { alertBanner.style.display='none'; }
 
   document.getElementById('m-bruto').textContent = fmt(totalBruto);
@@ -470,22 +668,10 @@ function atualizar() {
   document.getElementById('m-porhora').textContent = fmt(porHora);
   document.getElementById('custo-km-label').textContent = 'R$ '+custoKm.toFixed(2).replace('.',',')+'/km';
 
-  // meta
-  const pct = meta>0 ? Math.min(100,(totalLiquido/meta)*100) : 0;
-  document.getElementById('meta-fill').style.width = pct.toFixed(1)+'%';
-  document.getElementById('meta-fill').style.background = pct>=100?'var(--green)':pct>=70?'var(--yellow)':'var(--green)';
-  document.getElementById('meta-pct').textContent = pct.toFixed(0)+'%';
-  document.getElementById('meta-label').textContent = fmt(totalLiquido)+' de '+fmt(meta);
-  const faltam = meta - totalLiquido;
-  document.getElementById('meta-faltam').textContent = meta>0 ? (faltam>0?'Faltam '+fmt(faltam):'🎉 Meta atingida!') : 'Configure uma meta';
-  if (meta>0 && faltam>0 && mediaDiaria>0) {
-    document.getElementById('meta-dias-necessarios').textContent = '~'+Math.ceil(faltam/mediaDiaria)+' dias de trabalho';
-  } else { document.getElementById('meta-dias-necessarios').textContent=''; }
-
   // projeção
   document.getElementById('proj-val').textContent = diasTrabalhados>0?fmt(projecao):'—';
   document.getElementById('proj-dias').textContent = diasTrabalhados;
-  document.getElementById('proj-restam').textContent = diasRestantes+' dias restantes';
+  document.getElementById('proj-restam').textContent = `restam ${diasRestantes} dia(s) no mês`;
   document.getElementById('proj-media').textContent = diasTrabalhados>0?fmt(mediaDiaria):'—';
 
   // melhor/pior
@@ -713,7 +899,7 @@ function cancelarEdicao() {
 }
 
 async function salvar() {
-  const { registros, meta, custoKm } = getD();
+  const { registros, meta, custoKm, diaVenc, metaDiaria } = getD();
   const data=document.getElementById('inp-data').value;
   const horas=parseFloat(document.getElementById('inp-horas').value);
   const km=parseFloat(document.getElementById('inp-km').value);
@@ -728,7 +914,7 @@ async function salvar() {
   if(editIdx>=0){registros[editIdx]=novoReg;}
   else{registros.push(novoReg);}
   registros.sort((a,b)=>a.data.localeCompare(b.data));
-  window._setData(registros,meta,custoKm);
+  window._setData(registros,meta,custoKm,diaVenc,metaDiaria);
   await window._save();
   cancelarEdicao();
   atualizar();
@@ -737,9 +923,9 @@ async function salvar() {
 
 async function excluir(idx) {
   if(!confirm('Excluir este registro?'))return;
-  const{registros,meta,custoKm}=getD();
+  const{registros,meta,custoKm,diaVenc,metaDiaria}=getD();
   registros.splice(idx,1);
-  window._setData(registros,meta,custoKm);
+  window._setData(registros,meta,custoKm,diaVenc,metaDiaria);
   await window._save();
   atualizar();
 }
@@ -747,18 +933,38 @@ async function excluir(idx) {
 async function salvarMeta() {
   const v=parseFloat(document.getElementById('inp-meta').value);
   if(isNaN(v)||v<0){alert('Valor inválido.');return;}
-  const{registros,custoKm}=getD();
-  window._setData(registros,v,custoKm);
+  const{registros,custoKm,diaVenc,metaDiaria}=getD();
+  window._setData(registros,v,custoKm,diaVenc,metaDiaria);
   await window._save();
   atualizar();
   alert('Meta salva!');
 }
 
+async function salvarDiaVenc() {
+  const v=parseInt(document.getElementById('inp-dia-venc').value);
+  if(isNaN(v)||v<1||v>28){alert('Use um dia entre 1 e 28.');return;}
+  const{registros,meta,custoKm,metaDiaria}=getD();
+  window._setData(registros,meta,custoKm,v,metaDiaria);
+  await window._save();
+  atualizar();
+  alert('Dia de vencimento salvo!');
+}
+
+async function salvarMetaDiaria() {
+  const v=parseFloat(document.getElementById('inp-meta-diaria').value);
+  if(isNaN(v)||v<0){alert('Valor inválido.');return;}
+  const{registros,meta,custoKm,diaVenc}=getD();
+  window._setData(registros,meta,custoKm,diaVenc,v);
+  await window._save();
+  atualizar();
+  alert('Meta diária salva!');
+}
+
 async function salvarCustoKm() {
   const v=parseFloat(document.getElementById('inp-custo-km').value);
   if(isNaN(v)||v<0){alert('Valor inválido.');return;}
-  const{registros,meta}=getD();
-  window._setData(registros,meta,v);
+  const{registros,meta,diaVenc,metaDiaria}=getD();
+  window._setData(registros,meta,v,diaVenc,metaDiaria);
   await window._save();
   atualizar();
   alert('Custo por km salvo!');
@@ -766,8 +972,8 @@ async function salvarCustoKm() {
 
 async function limparDados() {
   if(!confirm('Apagar tudo permanentemente?'))return;
-  const{meta,custoKm}=getD();
-  window._setData([],meta,custoKm);
+  const{meta,custoKm,diaVenc,metaDiaria}=getD();
+  window._setData([],meta,custoKm,diaVenc,metaDiaria);
   await window._save();
   atualizar();
 }
@@ -786,38 +992,64 @@ function exportCSV() {
 
 async function importCSV(event) {
   const file=event.target.files[0];if(!file)return;
-  const text=await file.text();
-  const lines=text.trim().split('\n');
+  let text=await file.text();
+  text = text.replace(/^\uFEFF/, ''); // remove BOM se vier de Excel
+  const lines=text.trim().split(/\r?\n/); // aceita CRLF (Windows/Excel) ou LF
   if(lines.length<2){alert('CSV inválido.');return;}
-  const{registros:ex,meta,custoKm}=getD();
+  const{registros:ex,meta,custoKm,diaVenc,metaDiaria}=getD();
   let imp=0,err=0;
   const novos=[...ex];
-  const header=lines[0].toLowerCase();
+
+  // Detecta separador: o Excel em PT-BR costuma resalvar CSV usando ; em vez de ,
+  const headerLine=lines[0];
+  const sep = (headerLine.split(';').length > headerLine.split(',').length) ? ';' : ',';
+  const header=headerLine.toLowerCase();
   const temTurno=header.includes('turno');
   const temObs=header.includes('obs');
+
+  // Converte número aceitando formato BR (1.234,56 ou 250,00) e US (250.00)
+  function parseNum(s) {
+    if (s==null) return NaN;
+    s = String(s).trim();
+    if (s==='') return NaN;
+    if (s.includes(',') && s.includes('.')) {
+      // 1.234,56 -> remove pontos de milhar, troca vírgula por ponto
+      s = s.replace(/\./g,'').replace(',', '.');
+    } else if (s.includes(',')) {
+      // 250,00 -> 250.00
+      s = s.replace(',', '.');
+    }
+    return parseFloat(s);
+  }
+
   for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
     try{
-      // parse CSV respeitando aspas
-      const cols=lines[i].match(/(".*?"|[^,]+)(?=,|$)/g)||lines[i].split(',');
+      // parse CSV respeitando aspas, com o separador detectado
+      const re = sep===';' ? /(".*?"|[^;]+)(?=;|$)/g : /(".*?"|[^,]+)(?=,|$)/g;
+      const cols=lines[i].match(re)||lines[i].split(sep);
       const clean=cols.map(c=>c.replace(/^"|"$/g,'').trim());
       if(clean.length<6){err++;continue;}
       const partes=clean[0].split('/');
+      if(partes.length<3){err++;continue;}
       const data=`${partes[2]}-${partes[1].padStart(2,'0')}-${partes[0].padStart(2,'0')}`;
       let off=0,turno='noite',obs='';
       if(temTurno){turno=clean[1]||'noite';off=1;}
-      const horas=parseFloat(clean[1+off]);
-      const km=parseFloat(clean[2+off]);
-      const bruto=parseFloat(clean[3+off]);
-      const custo=parseFloat(clean[4+off]);
-      const liquido=parseFloat(clean[5+off]);
+      const horas=parseNum(clean[1+off]);
+      const km=parseNum(clean[2+off]);
+      const bruto=parseNum(clean[3+off]);
+      let custo=parseNum(clean[4+off]);
+      let liquido=parseNum(clean[5+off]);
       if(temObs&&clean[6+off]) obs=clean[6+off];
       if(isNaN(horas)||isNaN(km)||isNaN(bruto)){err++;continue;}
+      if(isNaN(custo)) custo=parseFloat((km*custoKm).toFixed(2));
+      if(isNaN(liquido)) liquido=parseFloat((bruto-custo).toFixed(2));
       novos.push({data,horas,km,bruto,custo,liquido,turno,obs});
       imp++;
     }catch(e){err++;}
   }
   novos.sort((a,b)=>a.data.localeCompare(b.data));
-  window._setData(novos,meta,custoKm);
+  window._setData(novos,meta,custoKm,diaVenc,metaDiaria);
   await window._save();
   atualizar();
   alert(`✅ Importados: ${imp}${err>0?`\n⚠️ Ignorados: ${err}`:''}`);
@@ -896,12 +1128,15 @@ function switchTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
 }
 
+// (dia de vencimento e meta diária são carregados dentro de loadData(), via Firebase)
+
 window.salvar=salvar;window.excluir=excluir;window.salvarMeta=salvarMeta;
 window.salvarCustoKm=salvarCustoKm;window.limparDados=limparDados;
 window.exportCSV=exportCSV;window.importCSV=importCSV;window.gerarPDF=gerarPDF;
 window.switchTab=switchTab;window.atualizar=atualizar;window.atualizarTurno=atualizarTurno;
 window.navSemana=navSemana;window.toggleDark=toggleDark;
 window.editarRegistro=editarRegistro;window.cancelarEdicao=cancelarEdicao;
+window.salvarDiaVenc=salvarDiaVenc;window.salvarMetaDiaria=salvarMetaDiaria;
 </script>
 </body>
 </html>
