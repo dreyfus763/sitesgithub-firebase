@@ -239,7 +239,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <!-- HERO: meta do ciclo -->
     <div class="hero-meta">
-      <div class="hero-eyebrow">Faltam para a meta · vence <span id="hero-venc-dia">dia 20</span></div>
+      <div class="hero-eyebrow">Faltam para a próxima parcela · vence em <span id="hero-venc-dia">—</span></div>
       <div class="hero-value" id="hero-faltam">—</div>
       <div class="hero-sub" id="hero-sub">—</div>
       <div class="hero-bar-track"><div class="hero-bar-fill" id="meta-fill" style="width:0%;background:var(--green);"></div></div>
@@ -559,7 +559,7 @@ function atualizar() {
   const pctCiclo = meta>0 ? Math.min(100,(liquidoCiclo/meta)*100) : 0;
 
   // HERO: faltam X para a meta
-  document.getElementById('hero-venc-dia').textContent = `dia ${diaVenc}`;
+  document.getElementById('hero-venc-dia').textContent = fmtData(ciclo.fim);
   const heroFaltam = document.getElementById('hero-faltam');
   const heroSub = document.getElementById('hero-sub');
   if (meta<=0) {
@@ -585,7 +585,7 @@ function atualizar() {
   document.getElementById('meta-label-val').textContent = fmt(liquidoCiclo);
   document.getElementById('meta-label-total').textContent = fmt(meta);
   document.getElementById('meta-periodo').textContent =
-    `Ciclo ${fmtData(ciclo.inicio)} – ${fmtData(ciclo.fim)} · dia ${diasDecorridos} de ${totalDiasCiclo}`;
+    `Juntando de ${fmtData(ciclo.inicio)} até o vencimento em ${fmtData(ciclo.fim)} · dia ${diasDecorridos} de ${totalDiasCiclo}`;
 
   // ===== META DIÁRIA (R$80/dia, considerando TODOS os dias do ciclo, mesmo sem registro) =====
   let deficit = 0; // soma do que faltou em dias que ficaram abaixo do mínimo (incluindo dias sem registro = déficit total do dia)
