@@ -494,10 +494,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <input type="number" id="fin-qtd" placeholder="ex: 48" min="1" step="1" />
         </div>
         <div class="form-group">
-          <label>Parcelas já pagas</label>
-          <input type="number" id="fin-pagas" placeholder="ex: 2" min="0" step="1" />
-        </div>
-        <div class="form-group">
           <label>1ª parcela (data)</label>
           <input type="date" id="fin-primeira" />
         </div>
@@ -505,6 +501,19 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <label>Dia do vencimento</label>
           <input type="number" id="fin-dia-venc" placeholder="ex: 20" min="1" max="31" step="1" />
         </div>
+      </div>
+      <div style="margin-top:12px;">
+        <label style="font-size:12px;color:var(--muted);font-weight:600;">Parcelas já pagas</label>
+        <div style="display:flex;gap:14px;margin:6px 0 8px;font-size:13px;">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+            <input type="radio" name="fin-modo" id="fin-modo-auto" checked onchange="atualizarModoPagas()" /> Automático (pela data)
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+            <input type="radio" name="fin-modo" id="fin-modo-manual" onchange="atualizarModoPagas()" /> Manual
+          </label>
+        </div>
+        <input type="number" id="fin-pagas" placeholder="ex: 2" min="0" step="1" style="max-width:240px;" />
+        <div id="fin-pagas-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Contado automaticamente pelas datas de vencimento.</div>
       </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="salvarFinanciamento()">Salvar ☁️</button>
@@ -1336,6 +1345,27 @@ function addMeses(dataISO, n) {
   return dataToISO(dt);
 }
 
+// Conta quantas parcelas já venceram entre a 1ª parcela e hoje (inclusive).
+// Ex: 1ª em 20/06 e hoje é 15/07 → 1 vencida (a de 20/06). Em 20/07 → 2.
+function parcelasVencidasAteHoje(f) {
+  if (!f || !f.primeiraParcela) return 0;
+  const hoje = new Date(today+'T12:00:00');
+  let count = 0;
+  for (let i=0; i<f.qtdParcelas; i++) {
+    const venc = new Date(addMeses(f.primeiraParcela, i)+'T12:00:00');
+    if (venc <= hoje) count++; else break;
+  }
+  return count;
+}
+
+// Parcelas pagas efetivas: se o modo for automático, calcula pela data;
+// senão usa o valor manual salvo. Sempre limitado ao total de parcelas.
+function parcelasPagasEfetivas(f) {
+  if (!f) return 0;
+  const base = (f.modoPagas === 'manual') ? (f.parcelasPagas||0) : parcelasVencidasAteHoje(f);
+  return Math.max(0, Math.min(base, f.qtdParcelas));
+}
+
 function preencherFormFinanciamento() {
   const f = getFinanciamento();
   if (!f) return;
@@ -1343,9 +1373,40 @@ function preencherFormFinanciamento() {
   set('fin-valor', f.valorFinanciado);
   set('fin-parcela', f.valorParcela);
   set('fin-qtd', f.qtdParcelas);
-  set('fin-pagas', f.parcelasPagas);
   set('fin-primeira', f.primeiraParcela);
   set('fin-dia-venc', f.diaVenc);
+  // modo de contagem das parcelas pagas
+  const modo = f.modoPagas || 'auto';
+  const rAuto = document.getElementById('fin-modo-auto');
+  const rManual = document.getElementById('fin-modo-manual');
+  if (rAuto && rManual) {
+    rAuto.checked = modo==='auto';
+    rManual.checked = modo==='manual';
+  }
+  // no modo manual mostra o valor salvo; no auto mostra o calculado (só leitura)
+  set('fin-pagas', modo==='manual' ? f.parcelasPagas : parcelasVencidasAteHoje(f));
+  atualizarModoPagas();
+}
+
+// Habilita/desabilita o campo "parcelas pagas" conforme o modo escolhido
+function atualizarModoPagas() {
+  const manual = document.getElementById('fin-modo-manual')?.checked;
+  const inp = document.getElementById('fin-pagas');
+  const hint = document.getElementById('fin-pagas-hint');
+  if (!inp) return;
+  inp.disabled = !manual;
+  inp.style.opacity = manual ? '1' : '0.55';
+  if (!manual) {
+    // mostra o valor que será calculado automaticamente
+    const f = getFinanciamento();
+    if (f) inp.value = parcelasVencidasAteHoje({...f,
+      primeiraParcela: document.getElementById('fin-primeira').value || f.primeiraParcela,
+      qtdParcelas: parseInt(document.getElementById('fin-qtd').value)||f.qtdParcelas
+    });
+    if (hint) hint.textContent = 'Contado automaticamente pelas datas de vencimento.';
+  } else {
+    if (hint) hint.textContent = 'Você define manualmente quantas já pagou.';
+  }
 }
 
 async function salvarFinanciamento() {
@@ -1355,10 +1416,11 @@ async function salvarFinanciamento() {
   const parcelasPagas = parseInt(document.getElementById('fin-pagas').value)||0;
   const primeiraParcela = document.getElementById('fin-primeira').value;
   const diaVenc = parseInt(document.getElementById('fin-dia-venc').value)||0;
+  const modoPagas = document.getElementById('fin-modo-manual')?.checked ? 'manual' : 'auto';
   if (!valorParcela || !qtdParcelas || !primeiraParcela) {
     alert('Preencha ao menos valor da parcela, quantidade e data da 1ª parcela.'); return;
   }
-  window._setFinanciamento({ valorFinanciado, valorParcela, qtdParcelas, parcelasPagas, primeiraParcela, diaVenc });
+  window._setFinanciamento({ valorFinanciado, valorParcela, qtdParcelas, parcelasPagas, primeiraParcela, diaVenc, modoPagas });
   await window._save();
   atualizar();
   alert('Financiamento salvo!');
@@ -1368,14 +1430,15 @@ async function salvarFinanciamento() {
 function calcFinanciamento() {
   const f = getFinanciamento();
   if (!f || !f.qtdParcelas || !f.valorParcela) return null;
-  const pagas = Math.min(f.parcelasPagas||0, f.qtdParcelas);
+  const pagas = parcelasPagasEfetivas(f);
   const restantes = f.qtdParcelas - pagas;
   const valorPago = pagas * f.valorParcela;
   const valorRestante = restantes * f.valorParcela;
   const pct = f.qtdParcelas>0 ? (pagas/f.qtdParcelas)*100 : 0;
   // Quitação = 1ª parcela + (qtd-1) meses (a última parcela vence qtd-1 meses após a primeira)
   const quitacao = f.primeiraParcela ? addMeses(f.primeiraParcela, f.qtdParcelas-1) : null;
-  return { pagas, restantes, valorPago, valorRestante, pct, quitacao, valorParcela:f.valorParcela };
+  const auto = (f.modoPagas || 'auto') === 'auto';
+  return { pagas, restantes, valorPago, valorRestante, pct, quitacao, valorParcela:f.valorParcela, auto };
 }
 
 function renderFinanciamento() {
@@ -1385,7 +1448,7 @@ function renderFinanciamento() {
   if (!c) { wrap.style.display='none'; return; }
   wrap.style.display='block';
   document.getElementById('fin-r-pagas').textContent = c.pagas;
-  document.getElementById('fin-r-qtd').textContent = `de ${c.pagas+c.restantes}`;
+  document.getElementById('fin-r-qtd').textContent = `de ${c.pagas+c.restantes}${c.auto?' · auto':''}`;
   document.getElementById('fin-r-restantes').textContent = c.restantes;
   document.getElementById('fin-r-pago').textContent = fmt(c.valorPago);
   document.getElementById('fin-r-restante-valor').textContent = fmt(c.valorRestante);
@@ -1657,6 +1720,7 @@ window.salvarDiaVenc=salvarDiaVenc;window.salvarMetaDiaria=salvarMetaDiaria;
 window.salvarMetaHora=salvarMetaHora;window.adicionarFolga=adicionarFolga;window.removerFolga=removerFolga;
 window.salvarCarga=salvarCarga;window.editarCarga=editarCarga;window.cancelarCarga=cancelarCarga;window.excluirCarga=excluirCarga;window.previewCarga=previewCarga;
 window.salvarValorKwh=salvarValorKwh;window.salvarFinanciamento=salvarFinanciamento;
+window.atualizarModoPagas=atualizarModoPagas;
 </script>
 </body>
 </html>
