@@ -39,7 +39,7 @@ function writeCache(data) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
-let registros = [], meta = 0, custoKm = 0.20, diaVenc = 20, metaDiaria = 80;
+let registros = [], meta = 0, custoKm = 0.20, diaVenc = 20, metaDiaria = 80, metaHora = 0, folgas = [];
 
 async function loadData() {
   setStatus('Carregando...', '#888');
@@ -51,6 +51,8 @@ async function loadData() {
     custoKm = cached.custoKm || 0.20;
     diaVenc = cached.diaVenc || 20;
     metaDiaria = cached.metaDiaria != null ? cached.metaDiaria : 80;
+    metaHora = cached.metaHora != null ? cached.metaHora : 0;
+    folgas = Array.isArray(cached.folgas) ? cached.folgas : [];
   }
   try {
     const d = await fbGet('motorista');
@@ -60,6 +62,8 @@ async function loadData() {
       custoKm = d.custoKm || 0.20;
       diaVenc = d.diaVenc || 20;
       metaDiaria = d.metaDiaria != null ? d.metaDiaria : 80;
+      metaHora = d.metaHora != null ? d.metaHora : 0;
+      folgas = Array.isArray(d.folgas) ? d.folgas : [];
       writeCache(d);
     }
     setStatus('☁️ Sincronizado', '#1D9E75');
@@ -70,12 +74,13 @@ async function loadData() {
   document.getElementById('inp-custo-km').value = custoKm;
   document.getElementById('inp-dia-venc').value = diaVenc;
   document.getElementById('inp-meta-diaria').value = metaDiaria;
+  const mh = document.getElementById('inp-meta-hora'); if (mh) mh.value = metaHora || '';
   atualizar();
 }
 
 async function saveData() {
   setStatus('Salvando...', '#aaa');
-  const payload = { registros, meta, custoKm, diaVenc, metaDiaria };
+  const payload = { registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas };
   writeCache(payload); // salva local na hora
   try {
     await fbSet('motorista', payload);
@@ -86,12 +91,15 @@ async function saveData() {
 }
 
 window._save = saveData;
-window._getData = () => ({ registros, meta, custoKm, diaVenc, metaDiaria });
+window._getData = () => ({ registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas });
 window._setData = (r, m, c, dv, md) => {
   registros = r; meta = m; custoKm = c;
   if (dv != null) diaVenc = dv;
   if (md != null) metaDiaria = md;
 };
+// Setters diretos para os campos novos (evita estender a assinatura posicional)
+window._setMetaHora = (v) => { metaHora = v; };
+window._setFolgas = (arr) => { folgas = Array.isArray(arr) ? arr : []; };
 loadData();
 </script>
 <style>
@@ -282,9 +290,10 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="hero-foot" style="margin-top:6px;">
         <span id="meta-periodo"></span>
       </div>
+      <div id="hero-comparativo" style="font-size:12px;font-weight:600;margin-top:8px;display:none;"></div>
     </div>
 
-    <!-- Faixa: meta diária R$80 -->
+    <!-- Faixa: quanto preciso por dia -->
     <div class="daily-strip" id="daily-strip">
       <div class="ds-icon" id="ds-icon">📅</div>
       <div class="ds-body">
@@ -292,6 +301,16 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <div class="ds-sub" id="md-dias-sub">—</div>
       </div>
       <div class="ds-value" id="md-necessario">—</div>
+    </div>
+
+    <!-- Faixa: meta por hora -->
+    <div class="daily-strip" id="metahora-strip" style="display:none;">
+      <div class="ds-icon" id="mh-icon">⏱️</div>
+      <div class="ds-body">
+        <div class="ds-title" id="mh-title">Meta por hora</div>
+        <div class="ds-sub" id="mh-sub">—</div>
+      </div>
+      <div class="ds-value" id="mh-value">—</div>
     </div>
 
     <div class="group-title" id="ciclo-title">Ciclo atual</div>
@@ -441,6 +460,25 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="btn-row"><button class="btn btn-primary" onclick="salvarMetaDiaria()">Salvar</button></div>
     </div>
     <div class="card">
+      <div class="card-title">Meta por hora (R$)</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Quanto você quer ganhar por hora trabalhada (líquido). O Resumo mostra seu ganho/hora real e avisa quando um dia rende abaixo disso. Deixe 0 para ocultar.</p>
+      <div class="form-group" style="max-width:240px;">
+        <label>Alvo de R$/hora</label>
+        <input type="number" id="inp-meta-hora" placeholder="ex: 25" min="0" step="1" />
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="salvarMetaHora()">Salvar</button></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Folgas do ciclo</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Marque os dias que você vai folgar. Eles não entram na divisão da meta — o valor por dia dos outros dias sobe automaticamente pra compensar.</p>
+      <div class="form-group" style="max-width:240px;">
+        <label>Adicionar dia de folga</label>
+        <input type="date" id="inp-folga" />
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="adicionarFolga()">+ Marcar folga</button></div>
+      <div id="folgas-list" style="margin-top:12px;"></div>
+    </div>
+    <div class="card">
       <div class="card-title">Custo por km (R$)</div>
       <div class="form-group" style="max-width:240px;">
         <label>Valor por km rodado</label>
@@ -459,7 +497,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 <!-- PDF MODAL -->
 <div class="modal-bg" id="pdf-modal">
   <div class="modal-box">
-    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">🖨️ Relatório mensal</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">🖨️ Relatório do ciclo</div>
     <div id="pdf-content" style="font-size:13px;line-height:1.7;"></div>
     <div class="btn-row" style="margin-top:14px;">
       <button class="btn btn-primary" onclick="window.print()">Imprimir / PDF</button>
@@ -491,11 +529,14 @@ function toggleDark() {
 let semanaOffset = 0;
 const charts = { mes: null, diaSem: null, meses: null };
 
-function getD() { return window._getData ? window._getData() : { registros:[], meta:0, custoKm:0.20, diaVenc:20, metaDiaria:80 }; }
+function getD() { return window._getData ? window._getData() : { registros:[], meta:0, custoKm:0.20, diaVenc:20, metaDiaria:80, metaHora:0, folgas:[] }; }
 
 // ---- Config extra: dia de vencimento e meta diária (vêm do Firebase junto com o resto) ----
 function getDiaVenc() { const{diaVenc}=getD(); return diaVenc!=null ? diaVenc : 20; }
 function getMetaDiaria() { const{metaDiaria}=getD(); return metaDiaria!=null ? metaDiaria : 80; }
+function getMetaHora() { const{metaHora}=getD(); return metaHora!=null ? metaHora : 0; }
+function getFolgas() { const{folgas}=getD(); return Array.isArray(folgas) ? folgas : []; }
+function isFolga(data) { return getFolgas().includes(data); }
 
 function fmt(n) { return 'R$ ' + (isNaN(n)||n==null?0:n).toFixed(2).replace('.', ','); }
 function fmtData(d) { if(!d) return ''; const [y,m,dia] = d.split('-'); return `${dia}/${m}/${y}`; }
@@ -564,11 +605,21 @@ function atualizar() {
   const porData = agruparPorData(registros);
 
   // ===== CICLO DA META (vence todo dia X) — tudo no Resumo usa o ciclo, não o mês civil =====
+  const metaHora = getMetaHora();
   const ciclo = getCicloAtual(today, diaVenc);
   const totalDiasCiclo = diasNoIntervalo(ciclo.inicio, ciclo.fim);
   const datasCicloAteHoje = listaDatasIntervalo(ciclo.inicio, today); // inclui hoje
   const diasDecorridos = datasCicloAteHoje.length;
   const diasRestantesCiclo = totalDiasCiclo - diasDecorridos;
+
+  // Folgas planejadas que ainda estão por vir neste ciclo (a partir de amanhã).
+  // Elas NÃO contam na hora de dividir a meta pelos dias restantes — assim,
+  // ao marcar uma folga, o valor/dia dos outros dias sobe automaticamente.
+  const datasRestantes = diasRestantesCiclo>0 ? listaDatasIntervalo(today, ciclo.fim).slice(1) : [];
+  const folgasRestantes = datasRestantes.filter(d => isFolga(d)).length;
+  const diasRestantesTrabalho = Math.max(0, diasRestantesCiclo - folgasRestantes);
+  // divisor para o "quanto preciso por dia": pelo menos 1 pra não dividir por zero
+  const divisorDias = Math.max(1, diasRestantesTrabalho);
 
   // Registros do ciclo atual (21 → 20), base de TODAS as métricas do Resumo
   const lista = registros.filter(r => r.data>=ciclo.inicio && r.data<=ciclo.fim);
@@ -590,6 +641,17 @@ function atualizar() {
   const faltaMeta = meta - liquidoCiclo;
   const pctCiclo = meta>0 ? Math.min(100,(liquidoCiclo/meta)*100) : 0;
 
+  // ===== COMPARAÇÃO COM O CICLO ANTERIOR (no mesmo ponto do ciclo) =====
+  // Pega o ciclo imediatamente anterior e soma só até o mesmo "dia N" que
+  // estamos agora, pra comparar maçã com maçã (ex: dia 10 deste vs dia 10 do passado).
+  const cicloAnt = getCicloAtual(new Date(new Date(ciclo.inicio+'T12:00:00').getTime()-86400000).toISOString().split('T')[0], diaVenc);
+  const datasAntMesmoPonto = listaDatasIntervalo(cicloAnt.inicio, cicloAnt.fim).slice(0, diasDecorridos);
+  const fimAntMesmoPonto = datasAntMesmoPonto.length ? datasAntMesmoPonto[datasAntMesmoPonto.length-1] : cicloAnt.inicio;
+  const liquidoAntMesmoPonto = registros
+    .filter(r => r.data>=cicloAnt.inicio && r.data<=fimAntMesmoPonto)
+    .reduce((s,r)=>s+r.liquido,0);
+  const temCicloAnterior = registros.some(r => r.data>=cicloAnt.inicio && r.data<=cicloAnt.fim);
+
   // HERO: faltam X para a meta
   document.getElementById('hero-venc-dia').textContent = fmtData(ciclo.fim);
   const heroFaltam = document.getElementById('hero-faltam');
@@ -605,8 +667,9 @@ function atualizar() {
   } else {
     heroFaltam.textContent = fmt(faltaMeta);
     heroFaltam.classList.remove('is-done');
-    if (diasRestantesCiclo>0) {
-      heroSub.textContent = `≈ ${fmt(faltaMeta/diasRestantesCiclo)}/dia nos ${diasRestantesCiclo} dia(s) restantes`;
+    if (diasRestantesTrabalho>0) {
+      const folgaTxt = folgasRestantes>0 ? ` (${folgasRestantes} folga(s) já descontada(s))` : '';
+      heroSub.textContent = `≈ ${fmt(faltaMeta/divisorDias)}/dia em ${diasRestantesTrabalho} dia(s) de trabalho${folgaTxt}`;
     } else {
       heroSub.textContent = '⚠️ ciclo encerrado sem bater a meta';
     }
@@ -619,15 +682,23 @@ function atualizar() {
   document.getElementById('meta-periodo').textContent =
     `Juntando de ${fmtData(ciclo.inicio)} até o vencimento em ${fmtData(ciclo.fim)} · dia ${diasDecorridos} de ${totalDiasCiclo}`;
 
-  // ===== META DIÁRIA (R$80/dia, considerando TODOS os dias do ciclo, mesmo sem registro) =====
-  let deficit = 0; // soma do que faltou em dias que ficaram abaixo do mínimo (incluindo dias sem registro = déficit total do dia)
-  datasCicloAteHoje.forEach(d => {
-    const liqDia = porData[d] || 0;
-    if (liqDia < metaDiaria) {
-      deficit += (metaDiaria - liqDia);
+  // ===== COMPARATIVO COM CICLO ANTERIOR (mostrado no hero) =====
+  const compEl = document.getElementById('hero-comparativo');
+  if (compEl) {
+    if (temCicloAnterior && liquidoAntMesmoPonto > 0) {
+      const diff = liquidoCiclo - liquidoAntMesmoPonto;
+      const pctDiff = (diff / liquidoAntMesmoPonto) * 100;
+      const acima = diff >= 0;
+      compEl.style.display = 'block';
+      compEl.style.color = acima ? 'var(--green)' : 'var(--red)';
+      compEl.textContent = `${acima?'▲':'▼'} ${Math.abs(pctDiff).toFixed(0)}% ${acima?'acima':'abaixo'} do ciclo anterior no mesmo dia (${fmt(liquidoAntMesmoPonto)})`;
+    } else {
+      compEl.style.display = 'none';
     }
-  });
-  const diasComDeficit = datasCicloAteHoje.filter(d => (porData[d]||0) < metaDiaria).length;
+  }
+
+  // ===== FAIXA "QUANTO PRECISO POR DIA" (agora descontando folgas) =====
+  const diasComDeficit = datasCicloAteHoje.filter(d => (porData[d]||0) < metaDiaria && !isFolga(d)).length;
   const dailyStrip = document.getElementById('daily-strip');
   const dsIcon = document.getElementById('ds-icon');
   const dsTitle = document.getElementById('md-necessario-sub2');
@@ -635,12 +706,12 @@ function atualizar() {
   const dsValue = document.getElementById('md-necessario');
   dailyStrip.classList.remove('ds-warn','ds-ok');
 
-  // Valor por dia = simplesmente o que falta pra meta dividido pelos dias que restam.
-  // (Sem misturar com o "déficit" da meta diária — isso confundia.)
-  if (meta>0 && faltaMeta>0 && diasRestantesCiclo>0) {
-    dsValue.textContent = fmt(faltaMeta/diasRestantesCiclo)+'/dia';
+  // Valor por dia = o que falta pra meta dividido pelos dias de TRABALHO restantes.
+  if (meta>0 && faltaMeta>0 && diasRestantesTrabalho>0) {
+    dsValue.textContent = fmt(faltaMeta/divisorDias)+'/dia';
     dsIcon.textContent='🎯';
-    dsTitle.textContent=`Para bater a meta nos ${diasRestantesCiclo} dia(s) restantes`;
+    const folgaTxt = folgasRestantes>0 ? ` · ${folgasRestantes} folga(s)` : '';
+    dsTitle.textContent=`Para bater a meta em ${diasRestantesTrabalho} dia(s) de trabalho${folgaTxt}`;
     dsSub.textContent = `Faltam ${fmt(faltaMeta)} de ${fmt(meta)}`;
     dailyStrip.classList.remove('ds-ok');
   } else if (meta>0 && faltaMeta<=0) {
@@ -649,10 +720,10 @@ function atualizar() {
     dsTitle.textContent='Você já bateu a meta deste ciclo';
     dsSub.textContent = `${fmt(liquidoCiclo)} de ${fmt(meta)}`;
     dailyStrip.classList.add('ds-ok');
-  } else if (meta>0 && diasRestantesCiclo<=0) {
+  } else if (meta>0 && diasRestantesTrabalho<=0) {
     dsValue.textContent = faltaMeta>0 ? '⚠️ não bateu' : '✅ ok';
     dsIcon.textContent = faltaMeta>0 ? '⚠️' : '✅';
-    dsTitle.textContent='Ciclo encerrado';
+    dsTitle.textContent = diasRestantesCiclo>0 ? 'Só restam folgas no ciclo' : 'Ciclo encerrado';
     dsSub.textContent = `${fmt(liquidoCiclo)} de ${fmt(meta)}`;
     if (faltaMeta<=0) dailyStrip.classList.add('ds-ok');
   } else {
@@ -660,6 +731,40 @@ function atualizar() {
     dsIcon.textContent='🎯';
     dsTitle.textContent='Meta diária';
     dsSub.textContent = 'Configure sua meta em Config';
+  }
+
+  // ===== META POR HORA =====
+  const mhStrip = document.getElementById('metahora-strip');
+  if (mhStrip) {
+    if (metaHora > 0) {
+      mhStrip.style.display = 'flex';
+      const mhIcon = document.getElementById('mh-icon');
+      const mhTitle = document.getElementById('mh-title');
+      const mhSub = document.getElementById('mh-sub');
+      const mhValue = document.getElementById('mh-value');
+      mhStrip.classList.remove('ds-warn','ds-ok');
+      mhValue.textContent = fmt(porHora)+'/h';
+      // conta dias que renderam abaixo da meta/hora (dia a dia, dias trabalhados)
+      const diasAbaixoHora = diasUnicos.filter(d => {
+        const regsDia = lista.filter(r=>r.data===d);
+        const hDia = regsDia.reduce((s,r)=>s+r.horas,0);
+        const lDia = regsDia.reduce((s,r)=>s+r.liquido,0);
+        return hDia>0 && (lDia/hDia) < metaHora;
+      }).length;
+      if (porHora >= metaHora) {
+        mhIcon.textContent='⏱️';
+        mhTitle.textContent=`No ritmo: acima de ${fmt(metaHora)}/h`;
+        mhSub.textContent = diasAbaixoHora>0 ? `${diasAbaixoHora} dia(s) renderam abaixo da meta/hora` : 'Todos os dias no alvo 👏';
+        mhStrip.classList.add('ds-ok');
+      } else {
+        mhIcon.textContent='⏱️';
+        mhTitle.textContent=`Abaixo da meta de ${fmt(metaHora)}/h`;
+        mhSub.textContent = `${diasAbaixoHora} de ${diasTrabalhados} dia(s) abaixo do alvo`;
+        mhStrip.classList.add('ds-warn');
+      }
+    } else {
+      mhStrip.style.display = 'none';
+    }
   }
 
   // hoje
@@ -680,22 +785,23 @@ function atualizar() {
   const alertBanner = document.getElementById('alert-banner');
   if (meta > 0 && diasDecorridos > 0) {
     const mediaDiariaCiclo = liquidoCiclo / diasDecorridos;
+    const folgaTxt = folgasRestantes>0 ? ` (fora ${folgasRestantes} folga(s))` : '';
     if (faltaMeta <= 0) {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-ok';
       alertBanner.textContent = `✅ Meta do ciclo batida! ${fmt(liquidoCiclo)} de ${fmt(meta)} — vencimento ${fmtData(ciclo.fim)}.`;
-    } else if (diasRestantesCiclo <= 0) {
+    } else if (diasRestantesTrabalho <= 0) {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-warn';
-      alertBanner.textContent = `⚠️ Ciclo encerrado faltando ${fmt(faltaMeta)} para a meta de ${fmt(meta)}.`;
+      alertBanner.textContent = `⚠️ Sem dias de trabalho restantes e faltam ${fmt(faltaMeta)} para a meta de ${fmt(meta)}.`;
     } else if (projecao >= meta) {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-ok';
-      alertBanner.textContent = `✅ No ritmo certo! Faltam ${fmt(faltaMeta)} — cerca de ${fmt(faltaMeta/diasRestantesCiclo)}/dia nos ${diasRestantesCiclo} dia(s) até ${fmtData(ciclo.fim)}.`;
+      alertBanner.textContent = `✅ No ritmo certo! Faltam ${fmt(faltaMeta)} — cerca de ${fmt(faltaMeta/divisorDias)}/dia em ${diasRestantesTrabalho} dia(s) de trabalho${folgaTxt} até ${fmtData(ciclo.fim)}.`;
     } else {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-warn';
-      alertBanner.textContent = `⚠️ Faltam ${fmt(faltaMeta)} para a meta — cerca de ${fmt(faltaMeta/diasRestantesCiclo)}/dia nos ${diasRestantesCiclo} dia(s) até ${fmtData(ciclo.fim)}. Sua média atual é ${fmt(mediaDiariaCiclo)}/dia.`;
+      alertBanner.textContent = `⚠️ Faltam ${fmt(faltaMeta)} para a meta — cerca de ${fmt(faltaMeta/divisorDias)}/dia em ${diasRestantesTrabalho} dia(s) de trabalho${folgaTxt} até ${fmtData(ciclo.fim)}. Sua média atual é ${fmt(mediaDiariaCiclo)}/dia.`;
     }
   } else { alertBanner.style.display='none'; }
 
@@ -730,6 +836,7 @@ function atualizar() {
   renderHistorico(registros);
   renderSemana(registros, porData);
   renderEvolucao(registros);
+  renderFolgas();
 }
 
 function mkChart(id, key, type, data, opts) {
@@ -1001,6 +1108,58 @@ async function salvarMetaDiaria() {
   alert('Meta diária salva!');
 }
 
+async function salvarMetaHora() {
+  const v=parseFloat(document.getElementById('inp-meta-hora').value);
+  if(isNaN(v)||v<0){alert('Valor inválido.');return;}
+  window._setMetaHora(v);
+  await window._save();
+  atualizar();
+  alert('Meta por hora salva!');
+}
+
+async function adicionarFolga() {
+  const d=document.getElementById('inp-folga').value;
+  if(!d){alert('Escolha uma data.');return;}
+  const folgas=getFolgas();
+  if(folgas.includes(d)){alert('Esse dia já está marcado como folga.');return;}
+  folgas.push(d);
+  folgas.sort();
+  window._setFolgas(folgas);
+  await window._save();
+  document.getElementById('inp-folga').value='';
+  renderFolgas();
+  atualizar();
+}
+
+async function removerFolga(d) {
+  const folgas=getFolgas().filter(x=>x!==d);
+  window._setFolgas(folgas);
+  await window._save();
+  renderFolgas();
+  atualizar();
+}
+
+function renderFolgas() {
+  const el=document.getElementById('folgas-list');
+  if(!el) return;
+  const folgas=getFolgas();
+  // mostra só folgas do ciclo atual em diante (as antigas não importam mais)
+  const diaVenc=getDiaVenc();
+  const ciclo=getCicloAtual(today, diaVenc);
+  const relevantes=folgas.filter(d=>d>=ciclo.inicio).sort();
+  if(!relevantes.length){
+    el.innerHTML='<div style="font-size:13px;color:var(--muted);">Nenhuma folga marcada neste ciclo.</div>';
+    return;
+  }
+  el.innerHTML=relevantes.map(d=>{
+    const passada = d < today;
+    return `<div class="row-line" style="border-bottom:1px solid var(--border);">
+      <span class="rl-label">${fmtData(d)}${d===today?' (hoje)':passada?' (já passou)':''}</span>
+      <button onclick="removerFolga('${d}')" style="background:none;border:1px solid rgba(226,75,74,0.3);color:var(--red);padding:2px 9px;border-radius:6px;cursor:pointer;font-size:12px;">remover</button>
+    </div>`;
+  }).join('');
+}
+
 async function salvarCustoKm() {
   const v=parseFloat(document.getElementById('inp-custo-km').value);
   if(isNaN(v)||v<0){alert('Valor inválido.');return;}
@@ -1098,10 +1257,11 @@ async function importCSV(event) {
 }
 
 function gerarPDF() {
-  const{registros,meta}=getD();
-  const lista=registros.filter(r=>r.data.startsWith(mesAtual()));
-  const[ano,mes]=mesAtual().split('-');
-  const nomeMes=MESES_L[parseInt(mes)-1]+' '+ano;
+  const{registros,meta,diaVenc}=getD();
+  const dv = diaVenc!=null ? diaVenc : 20;
+  const ciclo = getCicloAtual(today, dv);
+  const lista=registros.filter(r=>r.data>=ciclo.inicio && r.data<=ciclo.fim);
+  const nomeMes=`Ciclo ${fmtData(ciclo.inicio)} – ${fmtData(ciclo.fim)}`;
   const tB=lista.reduce((s,r)=>s+r.bruto,0);
   const tC=lista.reduce((s,r)=>s+r.custo,0);
   const tL=lista.reduce((s,r)=>s+r.liquido,0);
@@ -1178,6 +1338,8 @@ window.switchTab=switchTab;window.atualizar=atualizar;window.atualizarTurno=atua
 window.navSemana=navSemana;window.toggleDark=toggleDark;
 window.editarRegistro=editarRegistro;window.cancelarEdicao=cancelarEdicao;
 window.salvarDiaVenc=salvarDiaVenc;window.salvarMetaDiaria=salvarMetaDiaria;
+window.salvarMetaHora=salvarMetaHora;window.adicionarFolga=adicionarFolga;window.removerFolga=removerFolga;
 </script>
 </body>
 </html>
+⁸
