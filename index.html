@@ -337,13 +337,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="row-line"><span class="rl-label">Ganho por hora</span><span class="rl-value"><span id="m-porhora">—</span><span class="rl-sub">líquido</span></span></div>
     </div>
 
-    <div class="group-title">Projeção</div>
-    <div class="group-card">
-      <div class="row-line"><span class="rl-label">Projeção do ciclo</span><span class="rl-value"><span id="proj-val">—</span><span class="rl-sub">no ritmo atual</span></span></div>
-      <div class="row-line"><span class="rl-label">Dias trabalhados</span><span class="rl-value"><span id="proj-dias">—</span><span class="rl-sub" id="proj-restam"></span></span></div>
-      <div class="row-line"><span class="rl-label">Média por dia</span><span class="rl-value"><span id="proj-media">—</span><span class="rl-sub">líquido</span></span></div>
-    </div>
-
     <div class="group-title">Acerto do ciclo</div>
     <div class="group-card">
       <div class="row-line"><span class="rl-label">Parcela</span><span class="rl-value" id="acerto-parcela">—</span></div>
@@ -445,6 +438,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
   <!-- CARREGAMENTOS -->
   <div id="tab-carregamentos" class="panel">
+    <div class="btn-row" style="margin-top:0;margin-bottom:12px;">
+      <button class="btn btn-secondary" style="flex:1;justify-content:center;" onclick="abrirImportCarga()">📥 Importar recargas (colar texto)</button>
+    </div>
     <div class="section-title">Resumo de energia</div>
     <div class="metrics" style="margin-bottom:14px;">
       <div class="metric"><div class="metric-label">Recargas</div><div class="metric-value" id="carga-total-n">—</div></div>
@@ -630,6 +626,33 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <div class="btn-row" style="margin-top:14px;">
       <button class="btn btn-primary" onclick="window.print()">Imprimir / PDF</button>
       <button class="btn btn-secondary" onclick="document.getElementById('pdf-modal').style.display='none'">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORTAR RECARGAS -->
+<div class="modal-bg" id="import-carga-modal">
+  <div class="modal-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px;">📥 Importar recargas</div>
+    <div id="import-carga-paste">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+        Cole abaixo as recargas, uma por linha, no formato:<br>
+        <strong>data - kWh - valor</strong> &nbsp;(ex: <code>21/06 - 9,50 kWh - R$ 6,65</code>).<br>
+        Data sem ano usa o ano atual. Linhas com <code>??</code> na data entram para revisão.
+      </div>
+      <textarea id="import-carga-raw" placeholder="Cole aqui..." style="width:100%;min-height:200px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;font-family:monospace;resize:vertical;background:var(--surface);color:var(--text);"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analisarImportCarga()">Analisar</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('import-carga-modal').style.display='none'">Cancelar</button>
+      </div>
+    </div>
+    <div id="import-carga-preview" style="display:none;">
+      <div id="import-carga-summary" style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;"></div>
+      <div id="import-carga-lines" style="max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="confirmarImportCarga()">✅ Adicionar recargas</button>
+        <button class="btn btn-secondary" onclick="voltarImportCarga()">← Voltar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -953,13 +976,8 @@ function atualizar() {
   document.getElementById('m-porhora').textContent = fmt(porHora);
   document.getElementById('custo-km-label').textContent = 'R$ '+custoKm.toFixed(2).replace('.',',')+'/km';
 
-  // projeção
-  document.getElementById('proj-val').textContent = diasTrabalhados>0?fmt(projecao):'—';
-  document.getElementById('proj-dias').textContent = diasTrabalhados;
-  document.getElementById('proj-restam').textContent = `restam ${diasRestantesCiclo} dia(s) no ciclo`;
   const cicloTitleEl = document.getElementById('ciclo-title');
   if (cicloTitleEl) cicloTitleEl.textContent = `Ciclo atual (${fmtData(ciclo.inicio).slice(0,5)} → ${fmtData(ciclo.fim).slice(0,5)})`;
-  document.getElementById('proj-media').textContent = diasTrabalhados>0?fmt(mediaDiaria):'—';
 
   // ===== ACERTO DO CICLO (parcela + energia das recargas do ciclo) =====
   const energiaCiclo = getCarregamentos()
@@ -1320,6 +1338,139 @@ function renderCarregamentos() {
     </div>`).join('');
 }
 
+// ===== IMPORTAR RECARGAS (colar texto) =====
+let importCargaParsed = null;
+
+function abrirImportCarga() {
+  document.getElementById('import-carga-raw').value = '';
+  document.getElementById('import-carga-paste').style.display = 'block';
+  document.getElementById('import-carga-preview').style.display = 'none';
+  importCargaParsed = null;
+  document.getElementById('import-carga-modal').style.display = 'flex';
+}
+function voltarImportCarga() {
+  document.getElementById('import-carga-paste').style.display = 'block';
+  document.getElementById('import-carga-preview').style.display = 'none';
+}
+
+// Converte "06,65" / "R$ 6,65" / "6.65" em número
+function parseNumCarga(s) {
+  if (s==null) return NaN;
+  let t = String(s).trim().replace(/r\$/i,'').replace(/kwh/i,'').replace(/\s/g,'');
+  if (!t) return NaN;
+  if (t.includes(',') && t.includes('.')) t = t.replace(/\./g,'').replace(',', '.');
+  else t = t.replace(',', '.');
+  return parseFloat(t);
+}
+
+// Analisa o texto colado. Cada linha: data - kWh - valor.
+// Aceita data dd/mm (usa ano atual) e marca datas ilegíveis (??) para revisão.
+function parseRecargasTexto(raw) {
+  const anoAtual = today.slice(0,4);
+  const linhas = raw.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+  const itens = [], ignoradas = [];
+  linhas.forEach(linha => {
+    // separa por hífen/traço (aceita - – —)
+    const partes = linha.split(/\s*[-–—]\s*/).map(x=>x.trim()).filter(Boolean);
+    // acha o pedaço da data (contém / ou ??), e os números de kWh e valor
+    let dataTxt = partes.find(p => /\d{1,2}\s*\/\s*\d{1,2}|\?\?/.test(p)) || partes[0] || '';
+    // números: kWh é o que vier antes de "valor"; pega todos os números da linha
+    const nums = [];
+    partes.forEach(p => { const n = parseNumCarga(p); if(!isNaN(n)) nums.push({n, p}); });
+    // kWh e valor: normalmente kWh > valor (kWh ~9-40, valor ~6-25), mas usamos a ordem do texto:
+    // primeiro número after data = kWh, segundo = valor
+    const numsOrdenados = partes
+      .filter(p => p!==dataTxt)
+      .map(p => parseNumCarga(p))
+      .filter(n => !isNaN(n));
+    const kwh = numsOrdenados[0];
+    const valor = numsOrdenados[1];
+
+    // resolve a data
+    let dataISO = null, dataRevisar = false;
+    const mData = dataTxt.match(/(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?/);
+    if (dataTxt.includes('??') || !mData) {
+      dataRevisar = true;
+      // se o mês é legível (??/06), usa dia 1 do mês pra não perder o registro
+      const mMes = dataTxt.match(/\?\?\s*\/\s*(\d{1,2})/);
+      if (mMes) {
+        const mes = mMes[1].padStart(2,'0');
+        dataISO = `${anoAtual}-${mes}-01`;
+      } else {
+        dataISO = today; // sem nada legível: joga pra hoje, mas marcado
+      }
+    } else {
+      const dia = mData[1].padStart(2,'0');
+      const mes = mData[2].padStart(2,'0');
+      let ano = mData[3] || anoAtual;
+      if (ano.length===2) ano = '20'+ano;
+      dataISO = `${ano}-${mes}-${dia}`;
+    }
+
+    if (isNaN(kwh) && isNaN(valor)) {
+      ignoradas.push({ linha, motivo:'Sem kWh nem valor reconhecidos' });
+      return;
+    }
+    // se faltar valor mas tiver kWh, calcula valor pelo preço atual; e vice-versa não dá
+    let kwhFinal = isNaN(kwh) ? null : parseFloat(kwh.toFixed(2));
+    let valorFinal = isNaN(valor) ? null : parseFloat(valor.toFixed(2));
+    if (valorFinal==null && kwhFinal!=null) valorFinal = parseFloat((kwhFinal*getValorKwh()).toFixed(2));
+    if (kwhFinal==null && valorFinal!=null) kwhFinal = parseFloat((valorFinal/getValorKwh()).toFixed(2));
+    // percentual reverso (pra manter o mesmo formato dos registros manuais): pct = 100 - kwh*100/38
+    let pct = Math.round(100 - (kwhFinal*100/BATERIA_KWH));
+    if (pct<0) pct=0; if (pct>100) pct=100;
+
+    itens.push({ data:dataISO, pct, kwh:kwhFinal, valor:valorFinal, revisar:dataRevisar, linhaOrig:linha });
+  });
+  return { itens, ignoradas };
+}
+
+function analisarImportCarga() {
+  const raw = document.getElementById('import-carga-raw').value;
+  if (!raw.trim()) { alert('Cole algum texto primeiro.'); return; }
+  importCargaParsed = parseRecargasTexto(raw);
+  renderImportCargaPreview(importCargaParsed);
+  document.getElementById('import-carga-paste').style.display = 'none';
+  document.getElementById('import-carga-preview').style.display = 'block';
+}
+
+function renderImportCargaPreview(p) {
+  const nRev = p.itens.filter(i=>i.revisar).length;
+  const partes = [`${p.itens.length} recarga(s) reconhecida(s)`];
+  if (nRev) partes.push(`${nRev} com data para revisar ⚠️`);
+  if (p.ignoradas.length) partes.push(`${p.ignoradas.length} linha(s) não importada(s)`);
+  document.getElementById('import-carga-summary').textContent = partes.join(' · ');
+
+  const linha = (txt, cls, tag) =>
+    `<div class="imp-line ${cls}" style="display:flex;justify-content:space-between;gap:6px;padding:6px 8px;border-radius:6px;margin-bottom:4px;font-size:12px;border:1px solid var(--border);background:${cls==='warn'?'var(--red-light)':'var(--surface2)'};">
+      <span>${txt}</span><span style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);flex-shrink:0;">${tag}</span></div>`;
+
+  let html = '';
+  p.itens.forEach(it => {
+    const dataLbl = it.revisar ? `${fmtData(it.data)} ⚠️` : fmtData(it.data);
+    html += linha(`${dataLbl} · ${(it.kwh||0).toFixed(2).replace('.',',')} kWh · ${fmt(it.valor)}`, it.revisar?'warn':'ok', it.revisar?'Revisar':'OK');
+  });
+  p.ignoradas.forEach(ig => { html += linha(`${escapeHTMLm(ig.linha)} <span style="color:var(--muted);">(${ig.motivo})</span>`, 'warn', 'Ignorado'); });
+  document.getElementById('import-carga-lines').innerHTML = html || '<div class="empty">Nada reconhecido.</div>';
+}
+
+function escapeHTMLm(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+
+async function confirmarImportCarga() {
+  if (!importCargaParsed || !importCargaParsed.itens.length) { alert('Nada para importar.'); return; }
+  const cargas = getCarregamentos();
+  importCargaParsed.itens.forEach(it => {
+    cargas.push({ data:it.data, pct:it.pct, kwh:it.kwh, valor:it.valor });
+  });
+  cargas.sort((a,b)=>a.data.localeCompare(b.data));
+  window._setCarregamentos(cargas);
+  await window._save();
+  atualizar();
+  document.getElementById('import-carga-modal').style.display='none';
+  const nRev = importCargaParsed.itens.filter(i=>i.revisar).length;
+  alert(`✅ ${importCargaParsed.itens.length} recarga(s) importada(s)!${nRev?`\n⚠️ ${nRev} com data para conferir no histórico.`:''}`);
+}
+
 async function salvarValorKwh() {
   const v = parseFloat(document.getElementById('inp-valor-kwh').value);
   if (isNaN(v) || v<0) { alert('Valor inválido.'); return; }
@@ -1636,51 +1787,71 @@ async function importCSV(event) {
 }
 
 function gerarPDF() {
-  const{registros,meta,diaVenc}=getD();
+  const{registros,meta,diaVenc,custoKm}=getD();
   const dv = diaVenc!=null ? diaVenc : 20;
+  const cKm = custoKm!=null ? custoKm : 0.20;
   const ciclo = getCicloAtual(today, dv);
   const lista=registros.filter(r=>r.data>=ciclo.inicio && r.data<=ciclo.fim);
   const nomeMes=`Ciclo ${fmtData(ciclo.inicio)} – ${fmtData(ciclo.fim)}`;
-  const tB=lista.reduce((s,r)=>s+r.bruto,0);
-  const tC=lista.reduce((s,r)=>s+r.custo,0);
-  const tL=lista.reduce((s,r)=>s+r.liquido,0);
-  const tK=lista.reduce((s,r)=>s+r.km,0);
-  const tH=lista.reduce((s,r)=>s+r.horas,0);
-  const pH=tH>0?tL/tH:0;
+
+  // Totais de corridas
+  const tB=lista.reduce((s,r)=>s+r.bruto,0);      // lucro bruto
+  const tK=lista.reduce((s,r)=>s+r.km,0);          // km rodados
+  const tH=lista.reduce((s,r)=>s+r.horas,0);       // horas
+  const custoTeorico = tK * cKm;                   // custo por km × km rodados
+  const tL = tB - custoTeorico;                    // lucro líquido (custo teórico)
+  const pH = tH>0 ? tL/tH : 0;
   const diasU=[...new Set(lista.map(r=>r.data))].length;
-  const porData={};
-  lista.forEach(r=>{if(!porData[r.data])porData[r.data]=[];porData[r.data].push(r);});
-  const linhas=Object.keys(porData).sort().map(data=>{
-    const itens=porData[data];
-    const lD=itens.reduce((s,r)=>s+r.liquido,0);
-    const bD=itens.reduce((s,r)=>s+r.bruto,0);
-    const hD=itens.reduce((s,r)=>s+r.horas,0);
-    const kD=itens.reduce((s,r)=>s+r.km,0);
-    const obs=itens.filter(r=>r.obs).map(r=>r.obs).join('; ');
-    const turnos=itens.map(r=>`<span style="font-size:10px;background:#f5f5f5;padding:1px 5px;border-radius:4px;">${TL[r.turno]||'🌙 Noite'}</span>`).join(' ');
-    return `<tr style="border-bottom:1px solid #eee;">
-      <td style="padding:6px 8px;">${fmtData(data)}<br>${turnos}${obs?`<br><span style="font-size:10px;color:#888;">📝 ${obs}</span>`:''}</td>
-      <td style="padding:6px 8px;text-align:center;">${hD.toFixed(1)}h</td>
-      <td style="padding:6px 8px;text-align:center;">${kD.toFixed(0)}</td>
-      <td style="padding:6px 8px;text-align:right;">${fmt(bD)}</td>
-      <td style="padding:6px 8px;text-align:right;font-weight:700;color:${lD>=0?'#1D9E75':'#E24B4A'}">${fmt(lD)}</td>
-    </tr>`;
-  }).join('');
+
+  // Recargas do ciclo
+  const cargasCiclo = getCarregamentos().filter(c=>c.data>=ciclo.inicio && c.data<=ciclo.fim);
+  const nCargas = cargasCiclo.length;
+  const kwhCiclo = cargasCiclo.reduce((s,c)=>s+(c.kwh||0),0);
+  const energiaCiclo = cargasCiclo.reduce((s,c)=>s+(c.valor||0),0);
+
+  // Acerto do ciclo
+  const parcela = meta||0;
+  const acertoTotal = parcela + energiaCiclo;
+
+  const box = (label, valor, cor) =>
+    `<div style="background:${cor?'#f0faf6':'#f5f5f5'};border-radius:8px;padding:10px;">
+      <div style="font-size:11px;color:#888;">${label}</div>
+      <div style="font-size:18px;font-weight:700;${cor?'color:#1D9E75;':''}">${valor}</div>
+    </div>`;
+
   document.getElementById('pdf-content').innerHTML=`
-    <div style="text-align:center;margin-bottom:14px;"><div style="font-size:18px;font-weight:700;">🚗 Controle Motorista</div><div style="color:#888;">Relatório — ${nomeMes}</div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-      <div style="background:#f0faf6;border-radius:8px;padding:10px;"><div style="font-size:11px;color:#888;">Lucro líquido</div><div style="font-size:18px;font-weight:700;color:#1D9E75;">${fmt(tL)}</div></div>
-      <div style="background:#f5f5f5;border-radius:8px;padding:10px;"><div style="font-size:11px;color:#888;">Lucro bruto</div><div style="font-size:18px;font-weight:700;">${fmt(tB)}</div></div>
-      <div style="background:#f5f5f5;border-radius:8px;padding:10px;"><div style="font-size:11px;color:#888;">Custo km</div><div style="font-size:18px;font-weight:700;">${fmt(tC)}</div></div>
-      <div style="background:#f5f5f5;border-radius:8px;padding:10px;"><div style="font-size:11px;color:#888;">KM rodados</div><div style="font-size:18px;font-weight:700;">${tK.toFixed(0)} km</div></div>
-      <div style="background:#f5f5f5;border-radius:8px;padding:10px;"><div style="font-size:11px;color:#888;">Horas</div><div style="font-size:18px;font-weight:700;">${tH.toFixed(1).replace('.',',')}h</div></div>
-      <div style="background:#f5f5f5;border-radius:8px;padding:10px;"><div style="font-size:11px;color:#888;">Por hora</div><div style="font-size:18px;font-weight:700;">${fmt(pH)}</div></div>
+    <div style="text-align:center;margin-bottom:14px;">
+      <div style="font-size:18px;font-weight:700;">🚗 Controle Motorista</div>
+      <div style="color:#888;">Resumo — ${nomeMes}</div>
     </div>
-    ${meta>0?`<div style="background:#f0faf6;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;"><b>Meta:</b> ${fmt(tL)} de ${fmt(meta)} — ${((tL/meta)*100).toFixed(0)}% · ${diasU} dias trabalhados</div>`:''}
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead><tr style="background:#f5f5f5;"><th style="padding:8px;text-align:left;">Data</th><th style="padding:8px;text-align:center;">Horas</th><th style="padding:8px;text-align:center;">KM</th><th style="padding:8px;text-align:right;">Bruto</th><th style="padding:8px;text-align:right;">Líquido</th></tr></thead>
-      <tbody>${linhas}</tbody>
+
+    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Resultado do ciclo</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+      ${box('Lucro líquido', fmt(tL), true)}
+      ${box('Lucro bruto', fmt(tB))}
+      ${box('KM rodados', tK.toFixed(0)+' km')}
+      ${box('Custo do carro', fmt(custoTeorico))}
+      ${box('Horas trabalhadas', tH.toFixed(1).replace('.',',')+'h')}
+      ${box('Ganho por hora', fmt(pH))}
+    </div>
+    <div style="font-size:11px;color:#888;margin-bottom:14px;">Custo do carro = ${tK.toFixed(0)} km × R$ ${cKm.toFixed(2).replace('.',',')}/km. Dias trabalhados: ${diasU}.</div>
+
+    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Energia (recargas)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+      ${box('Recargas', String(nCargas))}
+      ${box('kWh', kwhCiclo.toFixed(1).replace('.',',')+' kWh')}
+      ${box('Gasto', fmt(energiaCiclo))}
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Acerto do ciclo</div>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px;">
+      <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;color:#555;">Parcela</td><td style="padding:8px 4px;text-align:right;font-weight:700;">${fmt(parcela)}</td></tr>
+      <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;color:#555;">Energia (recargas do ciclo)</td><td style="padding:8px 4px;text-align:right;font-weight:700;">${fmt(energiaCiclo)}</td></tr>
+      <tr style="background:#f0faf6;"><td style="padding:10px 4px;font-weight:700;">Total a enviar</td><td style="padding:10px 4px;text-align:right;font-weight:700;font-size:16px;color:#1D9E75;">${fmt(acertoTotal)}</td></tr>
     </table>
+
+    ${meta>0?`<div style="background:#f5f5f5;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;"><b>Meta do ciclo:</b> ${fmt(tL)} de ${fmt(meta)} — ${((tL/meta)*100).toFixed(0)}%</div>`:''}
+
     <div style="margin-top:10px;font-size:10px;color:#aaa;text-align:center;">Gerado em ${new Date().toLocaleDateString('pt-BR')} · Controle Motorista</div>`;
   document.getElementById('pdf-modal').style.display='flex';
 }
@@ -1721,6 +1892,7 @@ window.salvarMetaHora=salvarMetaHora;window.adicionarFolga=adicionarFolga;window
 window.salvarCarga=salvarCarga;window.editarCarga=editarCarga;window.cancelarCarga=cancelarCarga;window.excluirCarga=excluirCarga;window.previewCarga=previewCarga;
 window.salvarValorKwh=salvarValorKwh;window.salvarFinanciamento=salvarFinanciamento;
 window.atualizarModoPagas=atualizarModoPagas;
+window.abrirImportCarga=abrirImportCarga;window.analisarImportCarga=analisarImportCarga;window.confirmarImportCarga=confirmarImportCarga;window.voltarImportCarga=voltarImportCarga;
 </script>
 </body>
 </html>
