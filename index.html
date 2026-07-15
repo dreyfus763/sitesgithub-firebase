@@ -1887,7 +1887,8 @@ async function importCSV(event) {
 function gerarPDF() {
   const{registros,meta,diaVenc,custoKm,valorKwh}=getD();
   const dv = diaVenc!=null ? diaVenc : 20;
-  const cKm = custoKm!=null ? custoKm : 0.20;
+  const cKm = calcCustoKmReal();                   // custo real (energia + extra), igual à meta
+  const detKm = calcCustoKmDetalhe();
   const ciclo = getCicloAtual(today, dv);
   const lista=registros.filter(r=>r.data>=ciclo.inicio && r.data<=ciclo.fim);
   const nomeMes=`Ciclo ${fmtData(ciclo.inicio)} – ${fmtData(ciclo.fim)}`;
@@ -1896,8 +1897,8 @@ function gerarPDF() {
   const tB=lista.reduce((s,r)=>s+r.bruto,0);      // lucro bruto
   const tK=lista.reduce((s,r)=>s+r.km,0);          // km rodados
   const tH=lista.reduce((s,r)=>s+r.horas,0);       // horas
-  const custoTeorico = tK * cKm;                   // custo por km × km rodados
-  const tL = tB - custoTeorico;                    // lucro líquido (custo teórico)
+  const custoTeorico = tK * cKm;                   // custo real por km × km rodados
+  const tL = tB - custoTeorico;                    // lucro líquido (custo real, igual à meta)
   const pH = tH>0 ? tL/tH : 0;
   const diasU=[...new Set(lista.map(r=>r.data))].length;
 
@@ -1932,7 +1933,7 @@ function gerarPDF() {
       ${box('Horas trabalhadas', tH.toFixed(1).replace('.',',')+'h')}
       ${box('Ganho por hora', fmt(pH))}
     </div>
-    <div style="font-size:11px;color:#888;margin-bottom:14px;">Custo do carro = ${tK.toFixed(0)} km × R$ ${cKm.toFixed(2).replace('.',',')}/km. Dias trabalhados: ${diasU}.</div>
+    <div style="font-size:11px;color:#888;margin-bottom:14px;">Custo do carro = ${tK.toFixed(0)} km × R$ ${cKm.toFixed(3).replace('.',',')}/km (energia R$ ${detKm.energiaKm.toFixed(3).replace('.',',')}${detKm.extra>0?` + extra R$ ${detKm.extra.toFixed(3).replace('.',',')}`:''}). Dias trabalhados: ${diasU}.</div>
 
     <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Energia (recargas em casa)</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px;">
