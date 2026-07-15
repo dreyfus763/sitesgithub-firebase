@@ -294,7 +294,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="ds-value" id="md-necessario">—</div>
     </div>
 
-    <div class="group-title">Mês atual</div>
+    <div class="group-title" id="ciclo-title">Ciclo atual</div>
     <div class="group-card">
       <div class="row-line"><span class="rl-label">Lucro líquido</span><span class="rl-value"><span id="m-liquido">—</span><span class="rl-sub">após custos</span></span></div>
       <div class="row-line"><span class="rl-label">Lucro bruto</span><span class="rl-value" id="m-bruto">—</span></div>
@@ -306,7 +306,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <div class="group-title">Projeção</div>
     <div class="group-card">
-      <div class="row-line"><span class="rl-label">Projeção do mês</span><span class="rl-value"><span id="proj-val">—</span><span class="rl-sub">no ritmo atual</span></span></div>
+      <div class="row-line"><span class="rl-label">Projeção do ciclo</span><span class="rl-value"><span id="proj-val">—</span><span class="rl-sub">no ritmo atual</span></span></div>
       <div class="row-line"><span class="rl-label">Dias trabalhados</span><span class="rl-value"><span id="proj-dias">—</span><span class="rl-sub" id="proj-restam"></span></span></div>
       <div class="row-line"><span class="rl-label">Média por dia</span><span class="rl-value"><span id="proj-media">—</span><span class="rl-sub">líquido</span></span></div>
     </div>
@@ -317,7 +317,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="row-line rl-highlight-red"><span class="rl-label">📉 Pior dia</span><span class="rl-value"><span id="worst-val">—</span><span class="rl-sub" id="worst-date"></span></span></div>
     </div>
 
-    <div class="section-title">Lucro líquido por dia (mês atual)</div>
+    <div class="section-title">Lucro líquido por dia (ciclo atual)</div>
     <div class="chart-wrap"><canvas id="chartMes"></canvas></div>
     <div class="btn-row" style="margin-top:14px;">
       <button class="btn btn-pdf" onclick="gerarPDF()">🖨️ Relatório PDF</button>
@@ -561,8 +561,17 @@ function atualizar() {
   const { registros, meta, custoKm } = getD();
   const diaVenc = getDiaVenc();
   const metaDiaria = getMetaDiaria();
-  const lista = registros.filter(r => r.data.startsWith(mesAtual()));
   const porData = agruparPorData(registros);
+
+  // ===== CICLO DA META (vence todo dia X) — tudo no Resumo usa o ciclo, não o mês civil =====
+  const ciclo = getCicloAtual(today, diaVenc);
+  const totalDiasCiclo = diasNoIntervalo(ciclo.inicio, ciclo.fim);
+  const datasCicloAteHoje = listaDatasIntervalo(ciclo.inicio, today); // inclui hoje
+  const diasDecorridos = datasCicloAteHoje.length;
+  const diasRestantesCiclo = totalDiasCiclo - diasDecorridos;
+
+  // Registros do ciclo atual (21 → 20), base de TODAS as métricas do Resumo
+  const lista = registros.filter(r => r.data>=ciclo.inicio && r.data<=ciclo.fim);
   const porDataMes = agruparPorData(lista);
 
   const totalBruto = lista.reduce((s,r)=>s+r.bruto,0);
@@ -574,19 +583,10 @@ function atualizar() {
   const diasUnicos = [...new Set(lista.map(r=>r.data))];
   const diasTrabalhados = diasUnicos.length;
   const mediaDiaria = diasTrabalhados>0 ? totalLiquido/diasTrabalhados : 0;
-  const diasNoMes = new Date(new Date(today).getFullYear(), new Date(today).getMonth()+1,0).getDate();
-  const diaAtual = parseInt(today.split('-')[2]);
-  const diasRestantes = diasNoMes - diaAtual;
-  const projecao = mediaDiaria * diasNoMes;
+  // projeção = média por dia trabalhado × total de dias do ciclo
+  const projecao = mediaDiaria * totalDiasCiclo;
 
-  // ===== CICLO DA META (vence todo dia X) =====
-  const ciclo = getCicloAtual(today, diaVenc);
-  const totalDiasCiclo = diasNoIntervalo(ciclo.inicio, ciclo.fim);
-  const datasCicloAteHoje = listaDatasIntervalo(ciclo.inicio, today); // inclui hoje
-  const diasDecorridos = datasCicloAteHoje.length;
-  const diasRestantesCiclo = totalDiasCiclo - diasDecorridos;
-  const liquidoCiclo = registros.filter(r=>r.data>=ciclo.inicio && r.data<=ciclo.fim)
-                                  .reduce((s,r)=>s+r.liquido,0);
+  const liquidoCiclo = totalLiquido;
   const faltaMeta = meta - liquidoCiclo;
   const pctCiclo = meta>0 ? Math.min(100,(liquidoCiclo/meta)*100) : 0;
 
@@ -633,25 +633,33 @@ function atualizar() {
   const dsTitle = document.getElementById('md-necessario-sub2');
   const dsSub = document.getElementById('md-dias-sub');
   const dsValue = document.getElementById('md-necessario');
-  dsSub.textContent = `${diasComDeficit} de ${diasDecorridos} dia(s) abaixo de ${fmt(metaDiaria)}`;
   dailyStrip.classList.remove('ds-warn','ds-ok');
-  if (diasRestantesCiclo > 0) {
-    const necessarioAgora = (metaDiaria * Math.max(0,diasRestantesCiclo)) + deficit;
-    const necessarioPorDiaMin = necessarioAgora / Math.max(1,diasRestantesCiclo);
-    dsValue.textContent = fmt(necessarioPorDiaMin)+'/dia';
-    if (deficit>0) {
-      dsIcon.textContent='⚠️';
-      dsTitle.textContent=`Déficit de ${fmt(deficit)} nos R$${metaDiaria.toFixed(0)}/dia`;
-      dailyStrip.classList.add('ds-warn');
-    } else {
-      dsIcon.textContent='✅';
-      dsTitle.textContent='Em dia com a meta diária';
-      dailyStrip.classList.add('ds-ok');
-    }
+
+  // Valor por dia = simplesmente o que falta pra meta dividido pelos dias que restam.
+  // (Sem misturar com o "déficit" da meta diária — isso confundia.)
+  if (meta>0 && faltaMeta>0 && diasRestantesCiclo>0) {
+    dsValue.textContent = fmt(faltaMeta/diasRestantesCiclo)+'/dia';
+    dsIcon.textContent='🎯';
+    dsTitle.textContent=`Para bater a meta nos ${diasRestantesCiclo} dia(s) restantes`;
+    dsSub.textContent = `Faltam ${fmt(faltaMeta)} de ${fmt(meta)}`;
+    dailyStrip.classList.remove('ds-ok');
+  } else if (meta>0 && faltaMeta<=0) {
+    dsValue.textContent = '✅ Meta batida';
+    dsIcon.textContent='🎉';
+    dsTitle.textContent='Você já bateu a meta deste ciclo';
+    dsSub.textContent = `${fmt(liquidoCiclo)} de ${fmt(meta)}`;
+    dailyStrip.classList.add('ds-ok');
+  } else if (meta>0 && diasRestantesCiclo<=0) {
+    dsValue.textContent = faltaMeta>0 ? '⚠️ não bateu' : '✅ ok';
+    dsIcon.textContent = faltaMeta>0 ? '⚠️' : '✅';
+    dsTitle.textContent='Ciclo encerrado';
+    dsSub.textContent = `${fmt(liquidoCiclo)} de ${fmt(meta)}`;
+    if (faltaMeta<=0) dailyStrip.classList.add('ds-ok');
   } else {
-    dsValue.textContent = deficit>0 ? '⚠️ déficit' : '✅ ok';
-    dsTitle.textContent = 'Ciclo encerrado';
-    if (deficit>0) dailyStrip.classList.add('ds-warn'); else dailyStrip.classList.add('ds-ok');
+    dsValue.textContent = '—';
+    dsIcon.textContent='🎯';
+    dsTitle.textContent='Meta diária';
+    dsSub.textContent = 'Configure sua meta em Config';
   }
 
   // hoje
@@ -668,27 +676,26 @@ function atualizar() {
     document.getElementById('today-detail').textContent = `Bruto: ${fmt(todayBruto)}`;
   } else { banner.style.display='none'; }
 
-  // alerta de ritmo (baseado no ciclo da meta agora, não no mês civil)
+  // alerta de ritmo (baseado só na meta do ciclo — sem misturar com déficit)
   const alertBanner = document.getElementById('alert-banner');
   if (meta > 0 && diasDecorridos > 0) {
-    const necessarioPorDiaCiclo = diasRestantesCiclo>0 ? (faltaMeta>0 ? faltaMeta/diasRestantesCiclo : 0) : 0;
     const mediaDiariaCiclo = liquidoCiclo / diasDecorridos;
-    if (deficit > 0) {
-      alertBanner.style.display='block';
-      alertBanner.className='alert-banner alert-warn';
-      alertBanner.textContent = `⚠️ Você está com ${fmt(deficit)} de déficit nos R$${metaDiaria.toFixed(0)}/dia. Para zerar e ainda bater a meta de ${fmt(meta)}, precisa de ${diasRestantesCiclo>0?fmt((metaDiaria*diasRestantesCiclo+deficit)/Math.max(1,diasRestantesCiclo)):'—'}/dia até ${fmtData(ciclo.fim)}.`;
-    } else if (faltaMeta <= 0) {
+    if (faltaMeta <= 0) {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-ok';
       alertBanner.textContent = `✅ Meta do ciclo batida! ${fmt(liquidoCiclo)} de ${fmt(meta)} — vencimento ${fmtData(ciclo.fim)}.`;
-    } else if (mediaDiariaCiclo*totalDiasCiclo >= meta) {
+    } else if (diasRestantesCiclo <= 0) {
+      alertBanner.style.display='block';
+      alertBanner.className='alert-banner alert-warn';
+      alertBanner.textContent = `⚠️ Ciclo encerrado faltando ${fmt(faltaMeta)} para a meta de ${fmt(meta)}.`;
+    } else if (projecao >= meta) {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-ok';
-      alertBanner.textContent = `✅ No ritmo certo para a meta de ${fmt(meta)} até ${fmtData(ciclo.fim)}.`;
+      alertBanner.textContent = `✅ No ritmo certo! Faltam ${fmt(faltaMeta)} — cerca de ${fmt(faltaMeta/diasRestantesCiclo)}/dia nos ${diasRestantesCiclo} dia(s) até ${fmtData(ciclo.fim)}.`;
     } else {
       alertBanner.style.display='block';
       alertBanner.className='alert-banner alert-warn';
-      alertBanner.textContent = `⚠️ Faltam ${fmt(faltaMeta)} para a meta. Necessário ≈ ${fmt(necessarioPorDiaCiclo)}/dia até ${fmtData(ciclo.fim)}.`;
+      alertBanner.textContent = `⚠️ Faltam ${fmt(faltaMeta)} para a meta — cerca de ${fmt(faltaMeta/diasRestantesCiclo)}/dia nos ${diasRestantesCiclo} dia(s) até ${fmtData(ciclo.fim)}. Sua média atual é ${fmt(mediaDiariaCiclo)}/dia.`;
     }
   } else { alertBanner.style.display='none'; }
 
@@ -703,7 +710,9 @@ function atualizar() {
   // projeção
   document.getElementById('proj-val').textContent = diasTrabalhados>0?fmt(projecao):'—';
   document.getElementById('proj-dias').textContent = diasTrabalhados;
-  document.getElementById('proj-restam').textContent = `restam ${diasRestantes} dia(s) no mês`;
+  document.getElementById('proj-restam').textContent = `restam ${diasRestantesCiclo} dia(s) no ciclo`;
+  const cicloTitleEl = document.getElementById('ciclo-title');
+  if (cicloTitleEl) cicloTitleEl.textContent = `Ciclo atual (${fmtData(ciclo.inicio).slice(0,5)} → ${fmtData(ciclo.fim).slice(0,5)})`;
   document.getElementById('proj-media').textContent = diasTrabalhados>0?fmt(mediaDiaria):'—';
 
   // melhor/pior
