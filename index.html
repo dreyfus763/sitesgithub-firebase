@@ -40,7 +40,7 @@ function writeCache(data) {
 }
 
 let registros = [], meta = 0, custoKm = 0.20, diaVenc = 20, metaDiaria = 80, metaHora = 0, folgas = [];
-let carregamentos = [], valorKwh = 0.70, financiamento = null;
+let carregamentos = [], valorKwh = 0.70, financiamento = null, extraKm = 0;
 
 async function loadData() {
   setStatus('Carregando...', '#888');
@@ -57,6 +57,7 @@ async function loadData() {
     carregamentos = Array.isArray(cached.carregamentos) ? cached.carregamentos : [];
     valorKwh = cached.valorKwh != null ? cached.valorKwh : 0.70;
     financiamento = cached.financiamento || null;
+    extraKm = cached.extraKm != null ? cached.extraKm : 0;
   }
   try {
     const d = await fbGet('motorista');
@@ -71,6 +72,7 @@ async function loadData() {
       carregamentos = Array.isArray(d.carregamentos) ? d.carregamentos : [];
       valorKwh = d.valorKwh != null ? d.valorKwh : 0.70;
       financiamento = d.financiamento || null;
+      extraKm = d.extraKm != null ? d.extraKm : 0;
       writeCache(d);
     }
     setStatus('☁️ Sincronizado', '#1D9E75');
@@ -83,13 +85,14 @@ async function loadData() {
   document.getElementById('inp-meta-diaria').value = metaDiaria;
   const mh = document.getElementById('inp-meta-hora'); if (mh) mh.value = metaHora || '';
   const vk = document.getElementById('inp-valor-kwh'); if (vk) vk.value = valorKwh;
+  const ek = document.getElementById('inp-extra-km'); if (ek) ek.value = extraKm || '';
   preencherFormFinanciamento();
   atualizar();
 }
 
 async function saveData() {
   setStatus('Salvando...', '#aaa');
-  const payload = { registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas, carregamentos, valorKwh, financiamento };
+  const payload = { registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas, carregamentos, valorKwh, financiamento, extraKm };
   writeCache(payload); // salva local na hora
   try {
     await fbSet('motorista', payload);
@@ -100,7 +103,7 @@ async function saveData() {
 }
 
 window._save = saveData;
-window._getData = () => ({ registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas, carregamentos, valorKwh, financiamento });
+window._getData = () => ({ registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas, carregamentos, valorKwh, financiamento, extraKm });
 window._setData = (r, m, c, dv, md) => {
   registros = r; meta = m; custoKm = c;
   if (dv != null) diaVenc = dv;
@@ -112,6 +115,7 @@ window._setFolgas = (arr) => { folgas = Array.isArray(arr) ? arr : []; };
 window._setCarregamentos = (arr) => { carregamentos = Array.isArray(arr) ? arr : []; };
 window._setValorKwh = (v) => { valorKwh = v; };
 window._setFinanciamento = (obj) => { financiamento = obj || null; };
+window._setExtraKm = (v) => { extraKm = v; };
 loadData();
 </script>
 <style>
@@ -617,13 +621,18 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
     <div class="card">
       <div class="card-title">Custo por km (automático)</div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Calculado sozinho pelas suas recargas (casa + rua) ÷ km rodados. É o custo real do carro e é o que a meta usa.</p>
-      <div id="custo-km-auto-info" style="font-size:12px;color:var(--green);background:var(--green-light);border:1px solid rgba(29,158,117,0.2);border-radius:8px;padding:8px 10px;margin-bottom:10px;">—</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Custo real = <strong>energia das recargas ÷ km rodados</strong> + um <strong>extra fixo</strong> (pneu, manutenção, etc). É o que a meta usa.</p>
+      <div id="custo-km-auto-info" style="font-size:12px;color:var(--green);background:var(--green-light);border:1px solid rgba(29,158,117,0.2);border-radius:8px;padding:8px 10px;margin-bottom:12px;">—</div>
+      <div class="form-group" style="max-width:240px;margin-bottom:10px;">
+        <label>Extra fixo por km (R$) — pneu, manutenção...</label>
+        <input type="number" id="inp-extra-km" placeholder="ex: 0,10" min="0" step="0.01" />
+      </div>
+      <div class="btn-row" style="margin-bottom:14px;"><button class="btn btn-primary" onclick="salvarExtraKm()">Salvar extra</button></div>
       <div class="form-group" style="max-width:240px;">
-        <label>Valor por km (manual — usado se não houver cargas)</label>
+        <label style="font-size:11px;">Custo/km manual (só usado se não houver cargas)</label>
         <input type="number" id="inp-custo-km" value="0.20" step="0.01" min="0" />
       </div>
-      <div class="btn-row"><button class="btn btn-primary" onclick="salvarCustoKm()">Salvar valor manual</button></div>
+      <div class="btn-row"><button class="btn btn-secondary" onclick="salvarCustoKm()">Salvar manual</button></div>
     </div>
     <div class="card">
       <div class="card-title" style="color:var(--red);">Limpar todos os dados</div>
@@ -718,15 +727,22 @@ function calcCarga(pctSubiu, vKwh) {
   const valor = kwh * vKwh;
   return { kwh: parseFloat(kwh.toFixed(2)), valor: parseFloat(valor.toFixed(2)) };
 }
-// Custo por km REAL = energia total de todas as cargas ÷ km total rodado (todos os registros).
-// Se não houver km ou cargas, cai no custo/km configurado manualmente como fallback.
-function calcCustoKmReal() {
+function getExtraKm() { const{extraKm}=getD(); return extraKm!=null ? extraKm : 0; }
+// Detalha o custo por km: energia (das cargas) + extra fixo (pneu/manutenção/etc).
+function calcCustoKmDetalhe() {
   const cargas = getCarregamentos();
   const energiaTotal = cargas.reduce((s,c)=>s+(c.valor||0),0);
   const { registros, custoKm } = getD();
   const kmTotal = registros.reduce((s,r)=>s+(r.km||0),0);
-  if (kmTotal>0 && energiaTotal>0) return energiaTotal / kmTotal;
-  return custoKm!=null ? custoKm : 0.20;
+  const extra = getExtraKm();
+  let energiaKm, temDados;
+  if (kmTotal>0 && energiaTotal>0) { energiaKm = energiaTotal / kmTotal; temDados = true; }
+  else { energiaKm = (custoKm!=null ? custoKm : 0.20); temDados = false; }
+  return { energiaKm, extra, total: energiaKm + extra, energiaTotal, kmTotal, temDados };
+}
+// Custo por km REAL final = energia/km + extra fixo.
+function calcCustoKmReal() {
+  return calcCustoKmDetalhe().total;
 }
 
 function fmt(n) { return 'R$ ' + (isNaN(n)||n==null?0:n).toFixed(2).replace('.', ','); }
@@ -1005,18 +1021,15 @@ function atualizar() {
   document.getElementById('m-horas').textContent = totalHoras.toFixed(1).replace('.',',')+' h';
   document.getElementById('m-porhora').textContent = fmt(porHora);
   document.getElementById('custo-km-label').textContent = 'R$ '+custoKmReal.toFixed(2).replace('.',',')+'/km (real)';
-  // escreve o custo/km real (calculado pelas cargas) automaticamente no campo do Config
-  const inpCusto = document.getElementById('inp-custo-km');
-  if (inpCusto) inpCusto.value = custoKmReal.toFixed(3);
   const custoAutoInfo = document.getElementById('custo-km-auto-info');
   if (custoAutoInfo) {
-    const cargas = getCarregamentos();
-    const energiaTotal = cargas.reduce((s,c)=>s+(c.valor||0),0);
-    const kmTotal = registros.reduce((s,r)=>s+(r.km||0),0);
-    if (kmTotal>0 && energiaTotal>0) {
-      custoAutoInfo.textContent = `Calculado: ${fmt(energiaTotal)} de energia ÷ ${kmTotal.toFixed(0)} km = R$ ${custoKmReal.toFixed(3).replace('.',',')}/km`;
+    const det = calcCustoKmDetalhe();
+    if (det.temDados) {
+      const extraTxt = det.extra>0 ? ` + R$ ${det.extra.toFixed(3).replace('.',',')} extra` : '';
+      custoAutoInfo.innerHTML = `Energia: ${fmt(det.energiaTotal)} ÷ ${det.kmTotal.toFixed(0)} km = R$ ${det.energiaKm.toFixed(3).replace('.',',')}/km${extraTxt}<br><strong>Custo real: R$ ${det.total.toFixed(3).replace('.',',')}/km</strong>`;
     } else {
-      custoAutoInfo.textContent = 'Ainda sem cargas ou km suficientes — usando o valor manual abaixo.';
+      const extraTxt = det.extra>0 ? ` + R$ ${det.extra.toFixed(3).replace('.',',')} extra = R$ ${det.total.toFixed(3).replace('.',',')}/km` : '';
+      custoAutoInfo.textContent = `Ainda sem cargas suficientes — usando o valor manual (R$ ${det.energiaKm.toFixed(2).replace('.',',')}/km)${extraTxt}.`;
     }
   }
 
@@ -1766,6 +1779,15 @@ function renderFolgas() {
   }).join('');
 }
 
+async function salvarExtraKm() {
+  const v=parseFloat(document.getElementById('inp-extra-km').value);
+  if(isNaN(v)||v<0){alert('Valor inválido.');return;}
+  window._setExtraKm(v);
+  await window._save();
+  atualizar();
+  alert('Extra por km salvo!');
+}
+
 async function salvarCustoKm() {
   const v=parseFloat(document.getElementById('inp-custo-km').value);
   if(isNaN(v)||v<0){alert('Valor inválido.');return;}
@@ -1959,7 +1981,7 @@ function switchTab(name) {
 // (dia de vencimento e meta diária são carregados dentro de loadData(), via Firebase)
 
 window.salvar=salvar;window.excluir=excluir;window.salvarMeta=salvarMeta;
-window.salvarCustoKm=salvarCustoKm;window.limparDados=limparDados;
+window.salvarCustoKm=salvarCustoKm;window.salvarExtraKm=salvarExtraKm;window.limparDados=limparDados;
 window.exportCSV=exportCSV;window.importCSV=importCSV;window.gerarPDF=gerarPDF;
 window.switchTab=switchTab;window.atualizar=atualizar;window.atualizarTurno=atualizarTurno;
 window.navSemana=navSemana;window.toggleDark=toggleDark;
