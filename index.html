@@ -340,7 +340,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <div class="group-title">Acerto do ciclo</div>
     <div class="group-card">
       <div class="row-line"><span class="rl-label">Parcela</span><span class="rl-value" id="acerto-parcela">—</span></div>
-      <div class="row-line"><span class="rl-label">Energia (recargas do ciclo)</span><span class="rl-value" id="acerto-energia">—</span></div>
+      <div class="row-line"><span class="rl-label">Energia · em casa 🏠</span><span class="rl-value" id="acerto-energia">—</span></div>
       <div class="row-line rl-highlight"><span class="rl-label" style="font-weight:700;">Total a enviar</span><span class="rl-value" id="acerto-total">—</span></div>
     </div>
 
@@ -447,6 +447,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="metric"><div class="metric-label">kWh carregados</div><div class="metric-value" id="carga-total-kwh">—</div></div>
       <div class="metric highlight"><div class="metric-label">Gasto em energia</div><div class="metric-value" id="carga-total-valor">—</div></div>
     </div>
+    <div style="font-size:12px;color:var(--muted);margin:-6px 2px 14px;" id="carga-total-split"></div>
 
     <div class="card" id="carga-form-card">
       <div class="card-title" id="carga-form-title">Nova recarga</div>
@@ -457,10 +458,22 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <input type="date" id="carga-data" />
         </div>
         <div class="form-group">
-          <label>Bateria antes da carga (%)</label>
-          <input type="number" id="carga-pct" placeholder="ex: 20" min="0" max="100" step="1" oninput="previewCarga()" />
+          <label>Local</label>
+          <select id="carga-local" onchange="localCargaMudou()">
+            <option value="casa">🏠 Casa (do meu pai)</option>
+            <option value="rua">🛣️ Rua</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quanto carregou (%)</label>
+          <input type="number" id="carga-pct" placeholder="ex: 60" min="0" max="100" step="1" oninput="previewCarga()" />
+        </div>
+        <div class="form-group">
+          <label>Preço do kWh (R$)</label>
+          <input type="number" id="carga-kwh-preco" placeholder="ex: 0,70" min="0" step="0.01" oninput="previewCarga()" />
         </div>
       </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:6px;">Ex: carregou de 20% até 80% = digite <strong>60</strong>. Casa já vem com o preço configurado; na rua, informe o preço do posto.</div>
       <div class="preview-box" id="carga-preview"></div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="salvarCarga()">Salvar ☁️</button>
@@ -594,8 +607,8 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div id="folgas-list" style="margin-top:12px;"></div>
     </div>
     <div class="card">
-      <div class="card-title">Valor do kWh (R$)</div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Preço que você paga por kWh na recarga. Usado em todos os cálculos da aba Carga.</p>
+      <div class="card-title">Valor do kWh · em casa (R$)</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Preço do kWh na <strong>casa do meu pai</strong> (onde você carrega e presta contas). Recargas na rua não entram aqui. Usado nos cálculos da aba Carga.</p>
       <div class="form-group" style="max-width:240px;">
         <label>R$ por kWh</label>
         <input type="number" id="inp-valor-kwh" placeholder="ex: 0,70" min="0" step="0.01" />
@@ -603,12 +616,14 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="btn-row"><button class="btn btn-primary" onclick="salvarValorKwh()">Salvar</button></div>
     </div>
     <div class="card">
-      <div class="card-title">Custo por km (R$)</div>
+      <div class="card-title">Custo por km (automático)</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Calculado sozinho pelas suas recargas (casa + rua) ÷ km rodados. É o custo real do carro e é o que a meta usa.</p>
+      <div id="custo-km-auto-info" style="font-size:12px;color:var(--green);background:var(--green-light);border:1px solid rgba(29,158,117,0.2);border-radius:8px;padding:8px 10px;margin-bottom:10px;">—</div>
       <div class="form-group" style="max-width:240px;">
-        <label>Valor por km rodado</label>
+        <label>Valor por km (manual — usado se não houver cargas)</label>
         <input type="number" id="inp-custo-km" value="0.20" step="0.01" min="0" />
       </div>
-      <div class="btn-row"><button class="btn btn-primary" onclick="salvarCustoKm()">Salvar</button></div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="salvarCustoKm()">Salvar valor manual</button></div>
     </div>
     <div class="card">
       <div class="card-title" style="color:var(--red);">Limpar todos os dados</div>
@@ -667,6 +682,7 @@ const TC = { manha:'tp-manha', tarde:'tp-tarde', noite:'tp-noite', madrugada:'tp
 const today = new Date().toISOString().split('T')[0];
 document.getElementById('inp-data').value = today;
 const cargaDataEl = document.getElementById('carga-data'); if (cargaDataEl) cargaDataEl.value = today;
+const cargaPrecoEl = document.getElementById('carga-kwh-preco'); if (cargaPrecoEl && !cargaPrecoEl.value) cargaPrecoEl.value = (window._getData? (window._getData().valorKwh!=null?window._getData().valorKwh:0.70):0.70);
 
 // Dark mode
 const savedDark = localStorage.getItem('darkMode') === '1';
@@ -694,11 +710,23 @@ const BATERIA_KWH = 38; // capacidade da bateria do carro
 function getCarregamentos() { const{carregamentos}=getD(); return Array.isArray(carregamentos) ? carregamentos : []; }
 function getValorKwh() { const{valorKwh}=getD(); return valorKwh!=null ? valorKwh : 0.70; }
 function getFinanciamento() { const{financiamento}=getD(); return financiamento || null; }
-// Calcula kWh e valor de uma carga a partir do percentual inicial e do valor do kWh
-function calcCarga(percentual, vKwh) {
-  const kwh = ((100 - percentual) * BATERIA_KWH) / 100;
+// Local de uma carga (registros antigos sem local contam como 'casa')
+function cargaLocal(c) { return c.local === 'rua' ? 'rua' : 'casa'; }
+// kWh de uma carga a partir de quanto SUBIU a bateria (%). Ex: subiu 60% => 22,8 kWh
+function calcCarga(pctSubiu, vKwh) {
+  const kwh = (pctSubiu * BATERIA_KWH) / 100;
   const valor = kwh * vKwh;
   return { kwh: parseFloat(kwh.toFixed(2)), valor: parseFloat(valor.toFixed(2)) };
+}
+// Custo por km REAL = energia total de todas as cargas ÷ km total rodado (todos os registros).
+// Se não houver km ou cargas, cai no custo/km configurado manualmente como fallback.
+function calcCustoKmReal() {
+  const cargas = getCarregamentos();
+  const energiaTotal = cargas.reduce((s,c)=>s+(c.valor||0),0);
+  const { registros, custoKm } = getD();
+  const kmTotal = registros.reduce((s,r)=>s+(r.km||0),0);
+  if (kmTotal>0 && energiaTotal>0) return energiaTotal / kmTotal;
+  return custoKm!=null ? custoKm : 0.20;
 }
 
 function fmt(n) { return 'R$ ' + (isNaN(n)||n==null?0:n).toFixed(2).replace('.', ','); }
@@ -789,10 +817,12 @@ function atualizar() {
   const porDataMes = agruparPorData(lista);
 
   const totalBruto = lista.reduce((s,r)=>s+r.bruto,0);
-  const totalCusto = lista.reduce((s,r)=>s+r.custo,0);
-  const totalLiquido = lista.reduce((s,r)=>s+r.liquido,0);
   const totalKm = lista.reduce((s,r)=>s+r.km,0);
   const totalHoras = lista.reduce((s,r)=>s+r.horas,0);
+  // Custo por km REAL, calculado pelas cargas (casa + rua). Usado na meta/lucro.
+  const custoKmReal = calcCustoKmReal();
+  const totalCusto = totalKm * custoKmReal;
+  const totalLiquido = totalBruto - totalCusto;
   const porHora = totalHoras>0 ? totalLiquido/totalHoras : 0;
   const diasUnicos = [...new Set(lista.map(r=>r.data))];
   const diasTrabalhados = diasUnicos.length;
@@ -974,7 +1004,21 @@ function atualizar() {
   document.getElementById('m-km').textContent = totalKm.toFixed(0)+' km';
   document.getElementById('m-horas').textContent = totalHoras.toFixed(1).replace('.',',')+' h';
   document.getElementById('m-porhora').textContent = fmt(porHora);
-  document.getElementById('custo-km-label').textContent = 'R$ '+custoKm.toFixed(2).replace('.',',')+'/km';
+  document.getElementById('custo-km-label').textContent = 'R$ '+custoKmReal.toFixed(2).replace('.',',')+'/km (real)';
+  // escreve o custo/km real (calculado pelas cargas) automaticamente no campo do Config
+  const inpCusto = document.getElementById('inp-custo-km');
+  if (inpCusto) inpCusto.value = custoKmReal.toFixed(3);
+  const custoAutoInfo = document.getElementById('custo-km-auto-info');
+  if (custoAutoInfo) {
+    const cargas = getCarregamentos();
+    const energiaTotal = cargas.reduce((s,c)=>s+(c.valor||0),0);
+    const kmTotal = registros.reduce((s,r)=>s+(r.km||0),0);
+    if (kmTotal>0 && energiaTotal>0) {
+      custoAutoInfo.textContent = `Calculado: ${fmt(energiaTotal)} de energia ÷ ${kmTotal.toFixed(0)} km = R$ ${custoKmReal.toFixed(3).replace('.',',')}/km`;
+    } else {
+      custoAutoInfo.textContent = 'Ainda sem cargas ou km suficientes — usando o valor manual abaixo.';
+    }
+  }
 
   const cicloTitleEl = document.getElementById('ciclo-title');
   if (cicloTitleEl) cicloTitleEl.textContent = `Ciclo atual (${fmtData(ciclo.inicio).slice(0,5)} → ${fmtData(ciclo.fim).slice(0,5)})`;
@@ -1251,22 +1295,39 @@ async function excluir(idx) {
 }
 
 // ===== CARREGAMENTOS (recargas do carro) =====
+// Quando muda o local, se for Casa preenche o preço configurado automaticamente.
+function localCargaMudou() {
+  const local = document.getElementById('carga-local').value;
+  const precoEl = document.getElementById('carga-kwh-preco');
+  if (local === 'casa') {
+    precoEl.value = getValorKwh();
+  } else if (!precoEl.value || parseFloat(precoEl.value)===getValorKwh()) {
+    precoEl.value = ''; // rua: limpa pra você digitar o preço do posto
+  }
+  previewCarga();
+}
+
 function previewCarga() {
   const pct = parseFloat(document.getElementById('carga-pct').value);
+  const preco = parseFloat(document.getElementById('carga-kwh-preco').value);
   const prev = document.getElementById('carga-preview');
-  if (isNaN(pct) || pct<0 || pct>100) { prev.style.display='none'; return; }
-  const { kwh, valor } = calcCarga(pct, getValorKwh());
+  if (isNaN(pct) || pct<0 || pct>100 || isNaN(preco) || preco<0) { prev.style.display='none'; return; }
+  const { kwh, valor } = calcCarga(pct, preco);
+  const local = document.getElementById('carga-local').value;
   prev.style.display='block';
-  prev.innerHTML = `Energia: <strong>${kwh.toFixed(2).replace('.',',')} kWh</strong> · Valor: <strong>${fmt(valor)}</strong>`;
+  prev.innerHTML = `${local==='casa'?'🏠 Casa':'🛣️ Rua'} · <strong>${kwh.toFixed(2).replace('.',',')} kWh</strong> · Valor: <strong>${fmt(valor)}</strong> (R$ ${preco.toFixed(2).replace('.',',')}/kWh)`;
 }
 
 async function salvarCarga() {
   const data = document.getElementById('carga-data').value;
   const pct = parseFloat(document.getElementById('carga-pct').value);
+  const local = document.getElementById('carga-local').value;
+  const preco = parseFloat(document.getElementById('carga-kwh-preco').value);
   const editIdx = parseInt(document.getElementById('carga-edit-idx').value);
-  if (!data || isNaN(pct) || pct<0 || pct>100) { alert('Preencha data e percentual (0 a 100).'); return; }
-  const { kwh, valor } = calcCarga(pct, getValorKwh());
-  const novo = { data, pct, kwh, valor };
+  if (!data || isNaN(pct) || pct<0 || pct>100) { alert('Preencha data e quanto carregou (0 a 100%).'); return; }
+  if (isNaN(preco) || preco<0) { alert('Informe o preço do kWh dessa carga.'); return; }
+  const { kwh, valor } = calcCarga(pct, preco);
+  const novo = { data, pct, local, valorKwh: preco, kwh, valor };
   const cargas = getCarregamentos();
   if (editIdx>=0) cargas[editIdx]=novo; else cargas.push(novo);
   cargas.sort((a,b)=>a.data.localeCompare(b.data));
@@ -1281,7 +1342,9 @@ function editarCarga(idx) {
   if (!c) return;
   document.getElementById('carga-edit-idx').value = idx;
   document.getElementById('carga-data').value = c.data;
+  document.getElementById('carga-local').value = cargaLocal(c);
   document.getElementById('carga-pct').value = c.pct;
+  document.getElementById('carga-kwh-preco').value = c.valorKwh != null ? c.valorKwh : getValorKwh();
   document.getElementById('carga-form-title').textContent = '✏️ Editar recarga';
   document.getElementById('carga-cancel-edit').style.display = 'inline-block';
   previewCarga();
@@ -1293,7 +1356,9 @@ function cancelarCarga() {
   document.getElementById('carga-form-title').textContent = 'Nova recarga';
   document.getElementById('carga-cancel-edit').style.display = 'none';
   document.getElementById('carga-data').value = today;
+  document.getElementById('carga-local').value = 'casa';
   document.getElementById('carga-pct').value = '';
+  document.getElementById('carga-kwh-preco').value = getValorKwh();
   document.getElementById('carga-preview').style.display = 'none';
 }
 
@@ -1314,20 +1379,30 @@ function renderCarregamentos() {
   if (nEl) {
     const totKwh = cargas.reduce((s,c)=>s+(c.kwh||0),0);
     const totVal = cargas.reduce((s,c)=>s+(c.valor||0),0);
+    const valCasa = cargas.filter(c=>cargaLocal(c)==='casa').reduce((s,c)=>s+(c.valor||0),0);
+    const valRua = cargas.filter(c=>cargaLocal(c)==='rua').reduce((s,c)=>s+(c.valor||0),0);
     nEl.textContent = cargas.length;
     kwhEl.textContent = totKwh.toFixed(1).replace('.',',')+' kWh';
     valEl.textContent = fmt(totVal);
+    const splitEl = document.getElementById('carga-total-split');
+    if (splitEl) splitEl.textContent = `🏠 Casa: ${fmt(valCasa)} · 🛣️ Rua: ${fmt(valRua)}`;
   }
   const el = document.getElementById('carga-list');
   if (!el) return;
   if (!cargas.length) { el.innerHTML='<div class="empty">Nenhuma recarga ainda.</div>'; return; }
   // mais recentes primeiro, guardando o índice real para editar/excluir
-  el.innerHTML = cargas.map((c,i)=>({c,i})).sort((a,b)=>b.c.data.localeCompare(a.c.data)).map(({c,i})=>`
+  el.innerHTML = cargas.map((c,i)=>({c,i})).sort((a,b)=>b.c.data.localeCompare(a.c.data)).map(({c,i})=>{
+    const local = cargaLocal(c);
+    const localBadge = local==='casa'
+      ? '<span class="turno-pill" style="background:#e8f5e9;color:#2e7d32;">🏠 Casa</span>'
+      : '<span class="turno-pill" style="background:#fff3e0;color:#e65100;">🛣️ Rua</span>';
+    const preco = c.valorKwh!=null ? ` · R$ ${c.valorKwh.toFixed(2).replace('.',',')}/kWh` : '';
+    return `
     <div class="hist-card">
       <div class="hist-summary">
         <div>
-          <div class="hist-date">${fmtData(c.data)}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Bateria: <strong>${c.pct}%</strong> · ${(c.kwh||0).toFixed(2).replace('.',',')} kWh</div>
+          <div class="hist-date">${fmtData(c.data)} ${localBadge}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Carregou <strong>${c.pct}%</strong> · ${(c.kwh||0).toFixed(2).replace('.',',')} kWh${preco}</div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;">
           <span class="badge badge-green">${fmt(c.valor)}</span>
@@ -1335,7 +1410,8 @@ function renderCarregamentos() {
           <button onclick="excluirCarga(${i})" style="background:none;border:1px solid rgba(226,75,74,0.3);color:var(--red);padding:2px 7px;border-radius:6px;cursor:pointer;font-size:11px;">✕</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ===== IMPORTAR RECARGAS (colar texto) =====
@@ -1787,7 +1863,7 @@ async function importCSV(event) {
 }
 
 function gerarPDF() {
-  const{registros,meta,diaVenc,custoKm}=getD();
+  const{registros,meta,diaVenc,custoKm,valorKwh}=getD();
   const dv = diaVenc!=null ? diaVenc : 20;
   const cKm = custoKm!=null ? custoKm : 0.20;
   const ciclo = getCicloAtual(today, dv);
@@ -1804,7 +1880,7 @@ function gerarPDF() {
   const diasU=[...new Set(lista.map(r=>r.data))].length;
 
   // Recargas do ciclo
-  const cargasCiclo = getCarregamentos().filter(c=>c.data>=ciclo.inicio && c.data<=ciclo.fim);
+  const cargasCiclo = getCarregamentos().filter(c=>c.data>=ciclo.inicio && c.data<=ciclo.fim && cargaLocal(c)==='casa');
   const nCargas = cargasCiclo.length;
   const kwhCiclo = cargasCiclo.reduce((s,c)=>s+(c.kwh||0),0);
   const energiaCiclo = cargasCiclo.reduce((s,c)=>s+(c.valor||0),0);
@@ -1836,17 +1912,18 @@ function gerarPDF() {
     </div>
     <div style="font-size:11px;color:#888;margin-bottom:14px;">Custo do carro = ${tK.toFixed(0)} km × R$ ${cKm.toFixed(2).replace('.',',')}/km. Dias trabalhados: ${diasU}.</div>
 
-    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Energia (recargas)</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Energia (recargas em casa)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px;">
       ${box('Recargas', String(nCargas))}
       ${box('kWh', kwhCiclo.toFixed(1).replace('.',',')+' kWh')}
       ${box('Gasto', fmt(energiaCiclo))}
     </div>
+    <div style="font-size:11px;color:#888;margin-bottom:14px;">🏠 Carregado em casa · R$ ${(valorKwh!=null?valorKwh:0.70).toFixed(2).replace('.',',')}/kWh. Recargas na rua não estão incluídas.</div>
 
     <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Acerto do ciclo</div>
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px;">
       <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;color:#555;">Parcela</td><td style="padding:8px 4px;text-align:right;font-weight:700;">${fmt(parcela)}</td></tr>
-      <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;color:#555;">Energia (recargas do ciclo)</td><td style="padding:8px 4px;text-align:right;font-weight:700;">${fmt(energiaCiclo)}</td></tr>
+      <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;color:#555;">Energia em casa <span style="font-size:11px;color:#999;">(${nCargas} recarga(s) · R$ ${(valorKwh!=null?valorKwh:0.70).toFixed(2).replace('.',',')}/kWh)</span></td><td style="padding:8px 4px;text-align:right;font-weight:700;">${fmt(energiaCiclo)}</td></tr>
       <tr style="background:#f0faf6;"><td style="padding:10px 4px;font-weight:700;">Total a enviar</td><td style="padding:10px 4px;text-align:right;font-weight:700;font-size:16px;color:#1D9E75;">${fmt(acertoTotal)}</td></tr>
     </table>
 
@@ -1893,6 +1970,7 @@ window.salvarCarga=salvarCarga;window.editarCarga=editarCarga;window.cancelarCar
 window.salvarValorKwh=salvarValorKwh;window.salvarFinanciamento=salvarFinanciamento;
 window.atualizarModoPagas=atualizarModoPagas;
 window.abrirImportCarga=abrirImportCarga;window.analisarImportCarga=analisarImportCarga;window.confirmarImportCarga=confirmarImportCarga;window.voltarImportCarga=voltarImportCarga;
+window.localCargaMudou=localCargaMudou;
 </script>
 </body>
 </html>
