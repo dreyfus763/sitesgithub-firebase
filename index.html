@@ -40,6 +40,7 @@ function writeCache(data) {
 }
 
 let registros = [], meta = 0, custoKm = 0.20, diaVenc = 20, metaDiaria = 80, metaHora = 0, folgas = [];
+let carregamentos = [], valorKwh = 0.70, financiamento = null;
 
 async function loadData() {
   setStatus('Carregando...', '#888');
@@ -53,6 +54,9 @@ async function loadData() {
     metaDiaria = cached.metaDiaria != null ? cached.metaDiaria : 80;
     metaHora = cached.metaHora != null ? cached.metaHora : 0;
     folgas = Array.isArray(cached.folgas) ? cached.folgas : [];
+    carregamentos = Array.isArray(cached.carregamentos) ? cached.carregamentos : [];
+    valorKwh = cached.valorKwh != null ? cached.valorKwh : 0.70;
+    financiamento = cached.financiamento || null;
   }
   try {
     const d = await fbGet('motorista');
@@ -64,6 +68,9 @@ async function loadData() {
       metaDiaria = d.metaDiaria != null ? d.metaDiaria : 80;
       metaHora = d.metaHora != null ? d.metaHora : 0;
       folgas = Array.isArray(d.folgas) ? d.folgas : [];
+      carregamentos = Array.isArray(d.carregamentos) ? d.carregamentos : [];
+      valorKwh = d.valorKwh != null ? d.valorKwh : 0.70;
+      financiamento = d.financiamento || null;
       writeCache(d);
     }
     setStatus('☁️ Sincronizado', '#1D9E75');
@@ -75,12 +82,14 @@ async function loadData() {
   document.getElementById('inp-dia-venc').value = diaVenc;
   document.getElementById('inp-meta-diaria').value = metaDiaria;
   const mh = document.getElementById('inp-meta-hora'); if (mh) mh.value = metaHora || '';
+  const vk = document.getElementById('inp-valor-kwh'); if (vk) vk.value = valorKwh;
+  preencherFormFinanciamento();
   atualizar();
 }
 
 async function saveData() {
   setStatus('Salvando...', '#aaa');
-  const payload = { registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas };
+  const payload = { registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas, carregamentos, valorKwh, financiamento };
   writeCache(payload); // salva local na hora
   try {
     await fbSet('motorista', payload);
@@ -91,7 +100,7 @@ async function saveData() {
 }
 
 window._save = saveData;
-window._getData = () => ({ registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas });
+window._getData = () => ({ registros, meta, custoKm, diaVenc, metaDiaria, metaHora, folgas, carregamentos, valorKwh, financiamento });
 window._setData = (r, m, c, dv, md) => {
   registros = r; meta = m; custoKm = c;
   if (dv != null) diaVenc = dv;
@@ -100,6 +109,9 @@ window._setData = (r, m, c, dv, md) => {
 // Setters diretos para os campos novos (evita estender a assinatura posicional)
 window._setMetaHora = (v) => { metaHora = v; };
 window._setFolgas = (arr) => { folgas = Array.isArray(arr) ? arr : []; };
+window._setCarregamentos = (arr) => { carregamentos = Array.isArray(arr) ? arr : []; };
+window._setValorKwh = (v) => { valorKwh = v; };
+window._setFinanciamento = (obj) => { financiamento = obj || null; };
 loadData();
 </script>
 <style>
@@ -261,6 +273,8 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <button class="tab" onclick="switchTab('semana')">Semana</button>
     <button class="tab" onclick="switchTab('evolucao')">Evolução</button>
     <button class="tab" onclick="switchTab('registrar')">Registrar</button>
+    <button class="tab" onclick="switchTab('carregamentos')">Carga</button>
+    <button class="tab" onclick="switchTab('financiamento')">Financ.</button>
     <button class="tab" onclick="switchTab('historico')">Histórico</button>
     <button class="tab" onclick="switchTab('config')">Config</button>
   </div>
@@ -330,10 +344,20 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="row-line"><span class="rl-label">Média por dia</span><span class="rl-value"><span id="proj-media">—</span><span class="rl-sub">líquido</span></span></div>
     </div>
 
-    <div class="group-title">Destaques</div>
+    <div class="group-title">Acerto do ciclo</div>
     <div class="group-card">
-      <div class="row-line rl-highlight"><span class="rl-label">🏆 Melhor dia</span><span class="rl-value"><span id="best-val">—</span><span class="rl-sub" id="best-date"></span></span></div>
-      <div class="row-line rl-highlight-red"><span class="rl-label">📉 Pior dia</span><span class="rl-value"><span id="worst-val">—</span><span class="rl-sub" id="worst-date"></span></span></div>
+      <div class="row-line"><span class="rl-label">Parcela</span><span class="rl-value" id="acerto-parcela">—</span></div>
+      <div class="row-line"><span class="rl-label">Energia (recargas do ciclo)</span><span class="rl-value" id="acerto-energia">—</span></div>
+      <div class="row-line rl-highlight"><span class="rl-label" style="font-weight:700;">Total a enviar</span><span class="rl-value" id="acerto-total">—</span></div>
+    </div>
+
+    <div id="fin-card-resumo" class="daily-strip" style="display:none;cursor:pointer;" onclick="switchTab('financiamento')">
+      <div class="ds-icon">🚗</div>
+      <div class="ds-body">
+        <div class="ds-title" id="fin-resumo-linha1">Financiamento</div>
+        <div class="ds-sub" id="fin-resumo-linha2">—</div>
+      </div>
+      <div class="ds-value" style="font-size:13px;" id="fin-resumo-quit">—</div>
     </div>
 
     <div class="section-title">Lucro líquido por dia (ciclo atual)</div>
@@ -419,6 +443,92 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
   </div>
 
+  <!-- CARREGAMENTOS -->
+  <div id="tab-carregamentos" class="panel">
+    <div class="section-title">Resumo de energia</div>
+    <div class="metrics" style="margin-bottom:14px;">
+      <div class="metric"><div class="metric-label">Recargas</div><div class="metric-value" id="carga-total-n">—</div></div>
+      <div class="metric"><div class="metric-label">kWh carregados</div><div class="metric-value" id="carga-total-kwh">—</div></div>
+      <div class="metric highlight"><div class="metric-label">Gasto em energia</div><div class="metric-value" id="carga-total-valor">—</div></div>
+    </div>
+
+    <div class="card" id="carga-form-card">
+      <div class="card-title" id="carga-form-title">Nova recarga</div>
+      <input type="hidden" id="carga-edit-idx" value="-1" />
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" id="carga-data" />
+        </div>
+        <div class="form-group">
+          <label>Bateria antes da carga (%)</label>
+          <input type="number" id="carga-pct" placeholder="ex: 20" min="0" max="100" step="1" oninput="previewCarga()" />
+        </div>
+      </div>
+      <div class="preview-box" id="carga-preview"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="salvarCarga()">Salvar ☁️</button>
+        <button class="btn btn-secondary" id="carga-cancel-edit" style="display:none;" onclick="cancelarCarga()">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="section-title">Histórico de recargas</div>
+    <div id="carga-list"><div class="empty">Nenhuma recarga ainda.</div></div>
+  </div>
+
+  <!-- FINANCIAMENTO -->
+  <div id="tab-financiamento" class="panel">
+    <div class="card">
+      <div class="card-title">Dados do financiamento</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Valor financiado (R$)</label>
+          <input type="number" id="fin-valor" placeholder="ex: 90000" min="0" step="100" />
+        </div>
+        <div class="form-group">
+          <label>Valor da parcela (R$)</label>
+          <input type="number" id="fin-parcela" placeholder="ex: 2223" min="0" step="1" />
+        </div>
+        <div class="form-group">
+          <label>Quantidade de parcelas</label>
+          <input type="number" id="fin-qtd" placeholder="ex: 48" min="1" step="1" />
+        </div>
+        <div class="form-group">
+          <label>Parcelas já pagas</label>
+          <input type="number" id="fin-pagas" placeholder="ex: 2" min="0" step="1" />
+        </div>
+        <div class="form-group">
+          <label>1ª parcela (data)</label>
+          <input type="date" id="fin-primeira" />
+        </div>
+        <div class="form-group">
+          <label>Dia do vencimento</label>
+          <input type="number" id="fin-dia-venc" placeholder="ex: 20" min="1" max="31" step="1" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="salvarFinanciamento()">Salvar ☁️</button>
+      </div>
+    </div>
+
+    <div id="fin-resumo-wrap" style="display:none;">
+      <div class="section-title">Situação do financiamento</div>
+      <div class="metrics" style="margin-bottom:14px;">
+        <div class="metric"><div class="metric-label">Parcelas pagas</div><div class="metric-value" id="fin-r-pagas">—</div><div class="metric-sub" id="fin-r-qtd"></div></div>
+        <div class="metric"><div class="metric-label">Restantes</div><div class="metric-value" id="fin-r-restantes">—</div></div>
+        <div class="metric highlight"><div class="metric-label">Já pago</div><div class="metric-value" id="fin-r-pago">—</div></div>
+        <div class="metric"><div class="metric-label">Falta pagar</div><div class="metric-value" id="fin-r-restante-valor">—</div></div>
+      </div>
+      <div class="meta-card">
+        <div style="display:flex;justify-content:space-between;font-size:13px;">
+          <span>Progresso da quitação</span><span id="fin-r-pct" style="font-weight:700;">0%</span>
+        </div>
+        <div class="meta-bar-track"><div class="meta-bar-fill" id="fin-r-fill" style="width:0%;background:var(--green);"></div></div>
+        <div style="font-size:12px;color:var(--muted);">Quitação prevista: <strong id="fin-r-quitacao" style="color:var(--text);">—</strong></div>
+      </div>
+    </div>
+  </div>
+
   <!-- HISTÓRICO -->
   <div id="tab-historico" class="panel">
     <div class="top-bar">
@@ -479,6 +589,15 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div id="folgas-list" style="margin-top:12px;"></div>
     </div>
     <div class="card">
+      <div class="card-title">Valor do kWh (R$)</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Preço que você paga por kWh na recarga. Usado em todos os cálculos da aba Carga.</p>
+      <div class="form-group" style="max-width:240px;">
+        <label>R$ por kWh</label>
+        <input type="number" id="inp-valor-kwh" placeholder="ex: 0,70" min="0" step="0.01" />
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="salvarValorKwh()">Salvar</button></div>
+    </div>
+    <div class="card">
       <div class="card-title">Custo por km (R$)</div>
       <div class="form-group" style="max-width:240px;">
         <label>Valor por km rodado</label>
@@ -515,6 +634,7 @@ const TC = { manha:'tp-manha', tarde:'tp-tarde', noite:'tp-noite', madrugada:'tp
 
 const today = new Date().toISOString().split('T')[0];
 document.getElementById('inp-data').value = today;
+const cargaDataEl = document.getElementById('carga-data'); if (cargaDataEl) cargaDataEl.value = today;
 
 // Dark mode
 const savedDark = localStorage.getItem('darkMode') === '1';
@@ -537,6 +657,17 @@ function getMetaDiaria() { const{metaDiaria}=getD(); return metaDiaria!=null ? m
 function getMetaHora() { const{metaHora}=getD(); return metaHora!=null ? metaHora : 0; }
 function getFolgas() { const{folgas}=getD(); return Array.isArray(folgas) ? folgas : []; }
 function isFolga(data) { return getFolgas().includes(data); }
+// ---- Carregamentos / energia ----
+const BATERIA_KWH = 38; // capacidade da bateria do carro
+function getCarregamentos() { const{carregamentos}=getD(); return Array.isArray(carregamentos) ? carregamentos : []; }
+function getValorKwh() { const{valorKwh}=getD(); return valorKwh!=null ? valorKwh : 0.70; }
+function getFinanciamento() { const{financiamento}=getD(); return financiamento || null; }
+// Calcula kWh e valor de uma carga a partir do percentual inicial e do valor do kWh
+function calcCarga(percentual, vKwh) {
+  const kwh = ((100 - percentual) * BATERIA_KWH) / 100;
+  const valor = kwh * vKwh;
+  return { kwh: parseFloat(kwh.toFixed(2)), valor: parseFloat(valor.toFixed(2)) };
+}
 
 function fmt(n) { return 'R$ ' + (isNaN(n)||n==null?0:n).toFixed(2).replace('.', ','); }
 function fmtData(d) { if(!d) return ''; const [y,m,dia] = d.split('-'); return `${dia}/${m}/${y}`; }
@@ -821,21 +952,35 @@ function atualizar() {
   if (cicloTitleEl) cicloTitleEl.textContent = `Ciclo atual (${fmtData(ciclo.inicio).slice(0,5)} → ${fmtData(ciclo.fim).slice(0,5)})`;
   document.getElementById('proj-media').textContent = diasTrabalhados>0?fmt(mediaDiaria):'—';
 
-  // melhor/pior
-  if (Object.keys(porData).length>0) {
-    const entries = Object.entries(porData);
-    const best = entries.reduce((a,b)=>a[1]>b[1]?a:b);
-    const worst = entries.reduce((a,b)=>a[1]<b[1]?a:b);
-    document.getElementById('best-val').textContent = fmt(best[1]);
-    document.getElementById('best-date').textContent = fmtData(best[0]);
-    document.getElementById('worst-val').textContent = fmt(worst[1]);
-    document.getElementById('worst-date').textContent = fmtData(worst[0]);
+  // ===== ACERTO DO CICLO (parcela + energia das recargas do ciclo) =====
+  const energiaCiclo = getCarregamentos()
+    .filter(c => c.data>=ciclo.inicio && c.data<=ciclo.fim)
+    .reduce((s,c)=>s+(c.valor||0),0);
+  const acertoTotal = (meta||0) + energiaCiclo;
+  document.getElementById('acerto-parcela').textContent = fmt(meta||0);
+  document.getElementById('acerto-energia').textContent = fmt(energiaCiclo);
+  document.getElementById('acerto-total').textContent = fmt(acertoTotal);
+
+  // ===== CARD FINANCIAMENTO no Resumo =====
+  const finCard = document.getElementById('fin-card-resumo');
+  const finCalc = calcFinanciamento();
+  if (finCard) {
+    if (finCalc) {
+      finCard.style.display = 'flex';
+      document.getElementById('fin-resumo-linha1').textContent = `${finCalc.restantes} parcela(s) restante(s)`;
+      document.getElementById('fin-resumo-linha2').textContent = `${finCalc.pagas} de ${finCalc.pagas+finCalc.restantes} pagas · ${finCalc.pct.toFixed(0)}%`;
+      document.getElementById('fin-resumo-quit').textContent = finCalc.quitacao ? 'Quita '+fmtData(finCalc.quitacao) : '';
+    } else {
+      finCard.style.display = 'none';
+    }
   }
 
   renderChartMes(porDataMes);
   renderHistorico(registros);
   renderSemana(registros, porData);
   renderEvolucao(registros);
+  renderCarregamentos();
+  renderFinanciamento();
   renderFolgas();
 }
 
@@ -1076,6 +1221,177 @@ async function excluir(idx) {
   window._setData(registros,meta,custoKm,diaVenc,metaDiaria);
   await window._save();
   atualizar();
+}
+
+// ===== CARREGAMENTOS (recargas do carro) =====
+function previewCarga() {
+  const pct = parseFloat(document.getElementById('carga-pct').value);
+  const prev = document.getElementById('carga-preview');
+  if (isNaN(pct) || pct<0 || pct>100) { prev.style.display='none'; return; }
+  const { kwh, valor } = calcCarga(pct, getValorKwh());
+  prev.style.display='block';
+  prev.innerHTML = `Energia: <strong>${kwh.toFixed(2).replace('.',',')} kWh</strong> · Valor: <strong>${fmt(valor)}</strong>`;
+}
+
+async function salvarCarga() {
+  const data = document.getElementById('carga-data').value;
+  const pct = parseFloat(document.getElementById('carga-pct').value);
+  const editIdx = parseInt(document.getElementById('carga-edit-idx').value);
+  if (!data || isNaN(pct) || pct<0 || pct>100) { alert('Preencha data e percentual (0 a 100).'); return; }
+  const { kwh, valor } = calcCarga(pct, getValorKwh());
+  const novo = { data, pct, kwh, valor };
+  const cargas = getCarregamentos();
+  if (editIdx>=0) cargas[editIdx]=novo; else cargas.push(novo);
+  cargas.sort((a,b)=>a.data.localeCompare(b.data));
+  window._setCarregamentos(cargas);
+  await window._save();
+  cancelarCarga();
+  atualizar();
+}
+
+function editarCarga(idx) {
+  const c = getCarregamentos()[idx];
+  if (!c) return;
+  document.getElementById('carga-edit-idx').value = idx;
+  document.getElementById('carga-data').value = c.data;
+  document.getElementById('carga-pct').value = c.pct;
+  document.getElementById('carga-form-title').textContent = '✏️ Editar recarga';
+  document.getElementById('carga-cancel-edit').style.display = 'inline-block';
+  previewCarga();
+  document.getElementById('carga-form-card').scrollIntoView({behavior:'smooth'});
+}
+
+function cancelarCarga() {
+  document.getElementById('carga-edit-idx').value = '-1';
+  document.getElementById('carga-form-title').textContent = 'Nova recarga';
+  document.getElementById('carga-cancel-edit').style.display = 'none';
+  document.getElementById('carga-data').value = today;
+  document.getElementById('carga-pct').value = '';
+  document.getElementById('carga-preview').style.display = 'none';
+}
+
+async function excluirCarga(idx) {
+  if (!confirm('Excluir esta recarga?')) return;
+  const cargas = getCarregamentos();
+  cargas.splice(idx,1);
+  window._setCarregamentos(cargas);
+  await window._save();
+  atualizar();
+}
+
+function renderCarregamentos() {
+  const cargas = getCarregamentos();
+  const nEl=document.getElementById('carga-total-n');
+  const kwhEl=document.getElementById('carga-total-kwh');
+  const valEl=document.getElementById('carga-total-valor');
+  if (nEl) {
+    const totKwh = cargas.reduce((s,c)=>s+(c.kwh||0),0);
+    const totVal = cargas.reduce((s,c)=>s+(c.valor||0),0);
+    nEl.textContent = cargas.length;
+    kwhEl.textContent = totKwh.toFixed(1).replace('.',',')+' kWh';
+    valEl.textContent = fmt(totVal);
+  }
+  const el = document.getElementById('carga-list');
+  if (!el) return;
+  if (!cargas.length) { el.innerHTML='<div class="empty">Nenhuma recarga ainda.</div>'; return; }
+  // mais recentes primeiro, guardando o índice real para editar/excluir
+  el.innerHTML = cargas.map((c,i)=>({c,i})).sort((a,b)=>b.c.data.localeCompare(a.c.data)).map(({c,i})=>`
+    <div class="hist-card">
+      <div class="hist-summary">
+        <div>
+          <div class="hist-date">${fmtData(c.data)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Bateria: <strong>${c.pct}%</strong> · ${(c.kwh||0).toFixed(2).replace('.',',')} kWh</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="badge badge-green">${fmt(c.valor)}</span>
+          <button onclick="editarCarga(${i})" style="background:none;border:1px solid var(--border);color:var(--muted);padding:2px 7px;border-radius:6px;cursor:pointer;font-size:11px;">✏️</button>
+          <button onclick="excluirCarga(${i})" style="background:none;border:1px solid rgba(226,75,74,0.3);color:var(--red);padding:2px 7px;border-radius:6px;cursor:pointer;font-size:11px;">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function salvarValorKwh() {
+  const v = parseFloat(document.getElementById('inp-valor-kwh').value);
+  if (isNaN(v) || v<0) { alert('Valor inválido.'); return; }
+  window._setValorKwh(v);
+  // recalcula kWh/valor de todas as cargas já registradas com o novo preço
+  const cargas = getCarregamentos().map(c=>{
+    const { kwh, valor } = calcCarga(c.pct, v);
+    return { ...c, kwh, valor };
+  });
+  window._setCarregamentos(cargas);
+  await window._save();
+  atualizar();
+  alert('Valor do kWh salvo! As recargas foram recalculadas.');
+}
+
+// ===== FINANCIAMENTO =====
+// Soma `n` meses a uma data ISO mantendo o dia (ajusta se o mês não tiver o dia).
+function addMeses(dataISO, n) {
+  const [y,m,d] = dataISO.split('-').map(Number);
+  const dt = new Date(y, (m-1)+n, 1, 12);
+  const ultimoDia = new Date(dt.getFullYear(), dt.getMonth()+1, 0).getDate();
+  dt.setDate(Math.min(d, ultimoDia));
+  return dataToISO(dt);
+}
+
+function preencherFormFinanciamento() {
+  const f = getFinanciamento();
+  if (!f) return;
+  const set=(id,v)=>{const el=document.getElementById(id); if(el&&v!=null) el.value=v;};
+  set('fin-valor', f.valorFinanciado);
+  set('fin-parcela', f.valorParcela);
+  set('fin-qtd', f.qtdParcelas);
+  set('fin-pagas', f.parcelasPagas);
+  set('fin-primeira', f.primeiraParcela);
+  set('fin-dia-venc', f.diaVenc);
+}
+
+async function salvarFinanciamento() {
+  const valorFinanciado = parseFloat(document.getElementById('fin-valor').value)||0;
+  const valorParcela = parseFloat(document.getElementById('fin-parcela').value)||0;
+  const qtdParcelas = parseInt(document.getElementById('fin-qtd').value)||0;
+  const parcelasPagas = parseInt(document.getElementById('fin-pagas').value)||0;
+  const primeiraParcela = document.getElementById('fin-primeira').value;
+  const diaVenc = parseInt(document.getElementById('fin-dia-venc').value)||0;
+  if (!valorParcela || !qtdParcelas || !primeiraParcela) {
+    alert('Preencha ao menos valor da parcela, quantidade e data da 1ª parcela.'); return;
+  }
+  window._setFinanciamento({ valorFinanciado, valorParcela, qtdParcelas, parcelasPagas, primeiraParcela, diaVenc });
+  await window._save();
+  atualizar();
+  alert('Financiamento salvo!');
+}
+
+// Calcula todos os derivados do financiamento (usado no Resumo e na aba)
+function calcFinanciamento() {
+  const f = getFinanciamento();
+  if (!f || !f.qtdParcelas || !f.valorParcela) return null;
+  const pagas = Math.min(f.parcelasPagas||0, f.qtdParcelas);
+  const restantes = f.qtdParcelas - pagas;
+  const valorPago = pagas * f.valorParcela;
+  const valorRestante = restantes * f.valorParcela;
+  const pct = f.qtdParcelas>0 ? (pagas/f.qtdParcelas)*100 : 0;
+  // Quitação = 1ª parcela + (qtd-1) meses (a última parcela vence qtd-1 meses após a primeira)
+  const quitacao = f.primeiraParcela ? addMeses(f.primeiraParcela, f.qtdParcelas-1) : null;
+  return { pagas, restantes, valorPago, valorRestante, pct, quitacao, valorParcela:f.valorParcela };
+}
+
+function renderFinanciamento() {
+  const wrap = document.getElementById('fin-resumo-wrap');
+  if (!wrap) return;
+  const c = calcFinanciamento();
+  if (!c) { wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  document.getElementById('fin-r-pagas').textContent = c.pagas;
+  document.getElementById('fin-r-qtd').textContent = `de ${c.pagas+c.restantes}`;
+  document.getElementById('fin-r-restantes').textContent = c.restantes;
+  document.getElementById('fin-r-pago').textContent = fmt(c.valorPago);
+  document.getElementById('fin-r-restante-valor').textContent = fmt(c.valorRestante);
+  document.getElementById('fin-r-pct').textContent = c.pct.toFixed(0)+'%';
+  document.getElementById('fin-r-fill').style.width = Math.min(100,c.pct).toFixed(1)+'%';
+  document.getElementById('fin-r-quitacao').textContent = c.quitacao ? fmtData(c.quitacao) : '—';
 }
 
 async function salvarMeta() {
@@ -1323,7 +1639,7 @@ function gerarPDF() {
 });
 
 function switchTab(name) {
-  const names=['resumo','semana','evolucao','registrar','historico','config'];
+  const names=['resumo','semana','evolucao','registrar','carregamentos','financiamento','historico','config'];
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
@@ -1339,7 +1655,8 @@ window.navSemana=navSemana;window.toggleDark=toggleDark;
 window.editarRegistro=editarRegistro;window.cancelarEdicao=cancelarEdicao;
 window.salvarDiaVenc=salvarDiaVenc;window.salvarMetaDiaria=salvarMetaDiaria;
 window.salvarMetaHora=salvarMetaHora;window.adicionarFolga=adicionarFolga;window.removerFolga=removerFolga;
+window.salvarCarga=salvarCarga;window.editarCarga=editarCarga;window.cancelarCarga=cancelarCarga;window.excluirCarga=excluirCarga;window.previewCarga=previewCarga;
+window.salvarValorKwh=salvarValorKwh;window.salvarFinanciamento=salvarFinanciamento;
 </script>
 </body>
 </html>
-⁸
