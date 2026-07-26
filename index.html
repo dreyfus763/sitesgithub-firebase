@@ -83,7 +83,6 @@ async function loadData() {
   document.getElementById('inp-custo-km').value = custoKm;
   document.getElementById('inp-dia-venc').value = diaVenc;
   document.getElementById('inp-meta-diaria').value = metaDiaria;
-  const mh = document.getElementById('inp-meta-hora'); if (mh) mh.value = metaHora || '';
   const vk = document.getElementById('inp-valor-kwh'); if (vk) vk.value = valorKwh;
   const ek = document.getElementById('inp-extra-km'); if (ek) ek.value = extraKm || '';
   preencherFormFinanciamento();
@@ -321,15 +320,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="ds-value" id="md-necessario">—</div>
     </div>
 
-    <!-- Faixa: meta por hora -->
-    <div class="daily-strip" id="metahora-strip" style="display:none;">
-      <div class="ds-icon" id="mh-icon">⏱️</div>
-      <div class="ds-body">
-        <div class="ds-title" id="mh-title">Meta por hora</div>
-        <div class="ds-sub" id="mh-sub">—</div>
-      </div>
-      <div class="ds-value" id="mh-value">—</div>
-    </div>
+
 
     <div class="group-title" id="ciclo-title">Ciclo atual</div>
     <div class="group-card">
@@ -384,9 +375,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
   <!-- EVOLUÇÃO -->
   <div id="tab-evolucao" class="panel">
-    <div class="section-title">Lucro líquido mês a mês</div>
+    <div class="section-title">Lucro líquido por ciclo</div>
     <div class="chart-wrap-tall"><canvas id="chartMeses"></canvas></div>
-    <div class="section-title" style="margin-top:18px;">Resumo por mês</div>
+    <div class="section-title" style="margin-top:18px;">Resumo por ciclo</div>
     <div id="evolucao-list"></div>
   </div>
 
@@ -590,15 +581,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <input type="number" id="inp-meta-diaria" placeholder="ex: 80" min="0" step="5" />
       </div>
       <div class="btn-row"><button class="btn btn-primary" onclick="salvarMetaDiaria()">Salvar</button></div>
-    </div>
-    <div class="card">
-      <div class="card-title">Meta por hora (R$)</div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Quanto você quer ganhar por hora trabalhada (líquido). O Resumo mostra seu ganho/hora real e avisa quando um dia rende abaixo disso. Deixe 0 para ocultar.</p>
-      <div class="form-group" style="max-width:240px;">
-        <label>Alvo de R$/hora</label>
-        <input type="number" id="inp-meta-hora" placeholder="ex: 25" min="0" step="1" />
-      </div>
-      <div class="btn-row"><button class="btn btn-primary" onclick="salvarMetaHora()">Salvar</button></div>
     </div>
     <div class="card">
       <div class="card-title">Folgas do ciclo</div>
@@ -812,7 +794,6 @@ function atualizar() {
   const porData = agruparPorData(registros);
 
   // ===== CICLO DA META (vence todo dia X) — tudo no Resumo usa o ciclo, não o mês civil =====
-  const metaHora = getMetaHora();
   const ciclo = getCicloAtual(today, diaVenc);
   const totalDiasCiclo = diasNoIntervalo(ciclo.inicio, ciclo.fim);
   const datasCicloAteHoje = listaDatasIntervalo(ciclo.inicio, today); // inclui hoje
@@ -942,40 +923,6 @@ function atualizar() {
     dsSub.textContent = 'Configure sua meta em Config';
   }
 
-  // ===== META POR HORA =====
-  const mhStrip = document.getElementById('metahora-strip');
-  if (mhStrip) {
-    if (metaHora > 0) {
-      mhStrip.style.display = 'flex';
-      const mhIcon = document.getElementById('mh-icon');
-      const mhTitle = document.getElementById('mh-title');
-      const mhSub = document.getElementById('mh-sub');
-      const mhValue = document.getElementById('mh-value');
-      mhStrip.classList.remove('ds-warn','ds-ok');
-      mhValue.textContent = fmt(porHora)+'/h';
-      // conta dias que renderam abaixo da meta/hora (dia a dia, dias trabalhados)
-      const diasAbaixoHora = diasUnicos.filter(d => {
-        const regsDia = lista.filter(r=>r.data===d);
-        const hDia = regsDia.reduce((s,r)=>s+r.horas,0);
-        const lDia = regsDia.reduce((s,r)=>s+r.liquido,0);
-        return hDia>0 && (lDia/hDia) < metaHora;
-      }).length;
-      if (porHora >= metaHora) {
-        mhIcon.textContent='⏱️';
-        mhTitle.textContent=`No ritmo: acima de ${fmt(metaHora)}/h`;
-        mhSub.textContent = diasAbaixoHora>0 ? `${diasAbaixoHora} dia(s) renderam abaixo da meta/hora` : 'Todos os dias no alvo 👏';
-        mhStrip.classList.add('ds-ok');
-      } else {
-        mhIcon.textContent='⏱️';
-        mhTitle.textContent=`Abaixo da meta de ${fmt(metaHora)}/h`;
-        mhSub.textContent = `${diasAbaixoHora} de ${diasTrabalhados} dia(s) abaixo do alvo`;
-        mhStrip.classList.add('ds-warn');
-      }
-    } else {
-      mhStrip.style.display = 'none';
-    }
-  }
-
   // hoje
   const todayReg = registros.filter(r=>r.data===today);
   const todayLiq = todayReg.reduce((s,r)=>s+r.liquido,0);
@@ -1036,9 +983,9 @@ function atualizar() {
   const cicloTitleEl = document.getElementById('ciclo-title');
   if (cicloTitleEl) cicloTitleEl.textContent = `Ciclo atual (${fmtData(ciclo.inicio).slice(0,5)} → ${fmtData(ciclo.fim).slice(0,5)})`;
 
-  // ===== ACERTO DO CICLO (parcela + energia das recargas do ciclo) =====
+  // ===== ACERTO DO CICLO (parcela + energia SÓ DE CASA das recargas do ciclo) =====
   const energiaCiclo = getCarregamentos()
-    .filter(c => c.data>=ciclo.inicio && c.data<=ciclo.fim)
+    .filter(c => c.data>=ciclo.inicio && c.data<=ciclo.fim && cargaLocal(c)==='casa')
     .reduce((s,c)=>s+(c.valor||0),0);
   const acertoTotal = (meta||0) + energiaCiclo;
   document.getElementById('acerto-parcela').textContent = fmt(meta||0);
@@ -1160,17 +1107,28 @@ function renderEvolucao(registros) {
   if (!registros||registros.length===0) {
     document.getElementById('evolucao-list').innerHTML='<div class="empty">Nenhum dado ainda.</div>'; return;
   }
-  const porMes={};
+  const diaVenc = getDiaVenc();
+  const custoKmReal = calcCustoKmReal(); // usa o custo real (energia + extra) também na evolução
+  // agrupa por CICLO (21 → 20). Chave = data de fim do ciclo (o vencimento).
+  const porCiclo={};
   registros.forEach(r=>{
-    const m=r.data.slice(0,7);
-    if(!porMes[m]) porMes[m]={bruto:0,liquido:0,custo:0,km:0,horas:0,dias:new Set()};
-    porMes[m].bruto+=r.bruto; porMes[m].liquido+=r.liquido; porMes[m].custo+=r.custo;
-    porMes[m].km+=r.km; porMes[m].horas+=r.horas; porMes[m].dias.add(r.data);
+    const c = getCicloAtual(r.data, diaVenc);
+    const chave = c.fim; // ISO do vencimento identifica o ciclo
+    if(!porCiclo[chave]) porCiclo[chave]={inicio:c.inicio, fim:c.fim, bruto:0, km:0, horas:0, dias:new Set()};
+    porCiclo[chave].bruto+=r.bruto;
+    porCiclo[chave].km+=r.km;
+    porCiclo[chave].horas+=r.horas;
+    porCiclo[chave].dias.add(r.data);
   });
-  const meses=Object.keys(porMes).sort();
-  const dataLiq=meses.map(m=>parseFloat(porMes[m].liquido.toFixed(2)));
-  const dataBruto=meses.map(m=>parseFloat(porMes[m].bruto.toFixed(2)));
-  const labels=meses.map(m=>{const[y,mo]=m.split('-');return MESES_S[parseInt(mo)-1]+'/'+y.slice(2);});
+  // líquido de cada ciclo = bruto - km*custoKmReal
+  const chaves=Object.keys(porCiclo).sort();
+  chaves.forEach(k=>{ porCiclo[k].custo = porCiclo[k].km*custoKmReal; porCiclo[k].liquido = porCiclo[k].bruto - porCiclo[k].custo; });
+
+  const dataLiq=chaves.map(k=>parseFloat(porCiclo[k].liquido.toFixed(2)));
+  const dataBruto=chaves.map(k=>parseFloat(porCiclo[k].bruto.toFixed(2)));
+  // rótulo curto do ciclo: "21/06–20/07"
+  const labelCiclo=(o)=>`${fmtData(o.inicio).slice(0,5)}–${fmtData(o.fim).slice(0,5)}`;
+  const labels=chaves.map(k=>labelCiclo(porCiclo[k]));
   mkChart('chartMeses','meses','bar',{
     labels,
     datasets:[
@@ -1179,20 +1137,18 @@ function renderEvolucao(registros) {
     ]
   },{legend:true});
 
-  // comparativo entre meses
-  document.getElementById('evolucao-list').innerHTML=[...meses].reverse().map((m,i)=>{
-    const d=porMes[m]; const idx=meses.indexOf(m);
-    const [y,mo]=m.split('-');
-    const nome=MESES_L[parseInt(mo)-1]+' '+y;
-    const phora=d.horas>0?d.liquido/d.horas:0;
+  // comparativo entre ciclos
+  document.getElementById('evolucao-list').innerHTML=[...chaves].reverse().map((k)=>{
+    const d=porCiclo[k]; const idx=chaves.indexOf(k);
+    const nome=`Ciclo ${labelCiclo(d)}`;
     let comp='';
     if(idx>0){
-      const prev=porMes[meses[idx-1]];
+      const prev=porCiclo[chaves[idx-1]];
       const diff=d.liquido-prev.liquido;
       const pct=prev.liquido>0?(diff/Math.abs(prev.liquido))*100:0;
       const cls=diff>0?'comp-up':diff<0?'comp-down':'comp-neutral';
       const arrow=diff>0?'↑':diff<0?'↓':'→';
-      comp=`<span class="comp-pill ${cls}">${arrow} ${Math.abs(pct).toFixed(0)}% vs mês anterior</span>`;
+      comp=`<span class="comp-pill ${cls}">${arrow} ${Math.abs(pct).toFixed(0)}% vs ciclo anterior</span>`;
     }
     return `<div class="card" style="margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
@@ -1208,7 +1164,7 @@ function renderEvolucao(registros) {
         <div>KM: <strong style="color:var(--text)">${d.km.toFixed(0)} km</strong></div>
         <div>Horas: <strong style="color:var(--text)">${d.horas.toFixed(1).replace('.',',')}h</strong></div>
         <div>Dias: <strong style="color:var(--text)">${d.dias.size}</strong></div>
-        <div>Por hora: <strong style="color:var(--text)">${fmt(phora)}</strong></div>
+        <div>Venc.: <strong style="color:var(--text)">${fmtData(d.fim)}</strong></div>
       </div>
     </div>`;
   }).join('');
@@ -1727,15 +1683,6 @@ async function salvarMetaDiaria() {
   alert('Meta diária salva!');
 }
 
-async function salvarMetaHora() {
-  const v=parseFloat(document.getElementById('inp-meta-hora').value);
-  if(isNaN(v)||v<0){alert('Valor inválido.');return;}
-  window._setMetaHora(v);
-  await window._save();
-  atualizar();
-  alert('Meta por hora salva!');
-}
-
 async function adicionarFolga() {
   const d=document.getElementById('inp-folga').value;
   if(!d){alert('Escolha uma data.');return;}
@@ -1988,7 +1935,7 @@ window.switchTab=switchTab;window.atualizar=atualizar;window.atualizarTurno=atua
 window.navSemana=navSemana;window.toggleDark=toggleDark;
 window.editarRegistro=editarRegistro;window.cancelarEdicao=cancelarEdicao;
 window.salvarDiaVenc=salvarDiaVenc;window.salvarMetaDiaria=salvarMetaDiaria;
-window.salvarMetaHora=salvarMetaHora;window.adicionarFolga=adicionarFolga;window.removerFolga=removerFolga;
+window.adicionarFolga=adicionarFolga;window.removerFolga=removerFolga;
 window.salvarCarga=salvarCarga;window.editarCarga=editarCarga;window.cancelarCarga=cancelarCarga;window.excluirCarga=excluirCarga;window.previewCarga=previewCarga;
 window.salvarValorKwh=salvarValorKwh;window.salvarFinanciamento=salvarFinanciamento;
 window.atualizarModoPagas=atualizarModoPagas;
