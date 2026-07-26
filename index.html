@@ -1133,9 +1133,10 @@ function renderEvolucao(registros) {
 
   const dataLiq=chaves.map(k=>parseFloat(porCiclo[k].liquido.toFixed(2)));
   const dataBruto=chaves.map(k=>parseFloat(porCiclo[k].bruto.toFixed(2)));
-  // rótulo curto do ciclo: "21/06–20/07"
-  const labelCiclo=(o)=>`${fmtData(o.inicio).slice(0,5)}–${fmtData(o.fim).slice(0,5)}`;
-  const labels=chaves.map(k=>labelCiclo(porCiclo[k]));
+  // rótulo pelo MÊS DO VENCIMENTO (fim do ciclo). Ex: ciclo 21/05–20/06 => "Junho"
+  const nomeMesCiclo=(o)=>{ const[y,mo]=o.fim.split('-'); return `${MESES_L[parseInt(mo)-1]} ${y}`; };
+  const nomeMesCurto=(o)=>{ const[y,mo]=o.fim.split('-'); return `${MESES_S[parseInt(mo)-1]}/${y.slice(2)}`; };
+  const labels=chaves.map(k=>nomeMesCurto(porCiclo[k]));
   mkChart('chartMeses','meses','bar',{
     labels,
     datasets:[
@@ -1147,7 +1148,7 @@ function renderEvolucao(registros) {
   // comparativo entre ciclos
   document.getElementById('evolucao-list').innerHTML=[...chaves].reverse().map((k)=>{
     const d=porCiclo[k]; const idx=chaves.indexOf(k);
-    const nome=`Ciclo ${labelCiclo(d)}`;
+    const nome=nomeMesCiclo(d);
     let comp='';
     if(idx>0){
       const prev=porCiclo[chaves[idx-1]];
@@ -1159,7 +1160,10 @@ function renderEvolucao(registros) {
     }
     return `<div class="card" style="margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-        <div style="font-size:14px;font-weight:700;">${nome}</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;">${nome}</div>
+          <div style="font-size:11px;color:var(--muted);">período ${fmtData(d.inicio).slice(0,5)} a ${fmtData(d.fim).slice(0,5)}</div>
+        </div>
         <div style="display:flex;align-items:center;gap:8px;">
           ${comp}
           <div style="font-size:17px;font-weight:700;color:var(--green);">${fmt(d.liquido)}</div>
