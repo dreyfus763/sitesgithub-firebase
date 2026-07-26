@@ -1109,17 +1109,24 @@ function renderEvolucao(registros) {
   }
   const diaVenc = getDiaVenc();
   const custoKmReal = calcCustoKmReal(); // usa o custo real (energia + extra) também na evolução
+  // valida a data de cada registro: precisa ser 'YYYY-MM-DD' válida
+  const dataValida = (s) => typeof s==='string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s+'T12:00:00').getTime());
+  const invalidos = registros.filter(r => !dataValida(r.data));
   // agrupa por CICLO (21 → 20). Chave = data de fim do ciclo (o vencimento).
   const porCiclo={};
-  registros.forEach(r=>{
+  registros.filter(r => dataValida(r.data)).forEach(r=>{
     const c = getCicloAtual(r.data, diaVenc);
     const chave = c.fim; // ISO do vencimento identifica o ciclo
     if(!porCiclo[chave]) porCiclo[chave]={inicio:c.inicio, fim:c.fim, bruto:0, km:0, horas:0, dias:new Set()};
-    porCiclo[chave].bruto+=r.bruto;
-    porCiclo[chave].km+=r.km;
-    porCiclo[chave].horas+=r.horas;
+    porCiclo[chave].bruto+=(r.bruto||0);
+    porCiclo[chave].km+=(r.km||0);
+    porCiclo[chave].horas+=(r.horas||0);
     porCiclo[chave].dias.add(r.data);
   });
+  // avisa se houver registros com data inválida (que somem do histórico mas bagunçam totais)
+  const avisoInvalidos = invalidos.length>0
+    ? `<div class="alert-banner alert-warn" style="margin-bottom:12px;">⚠️ ${invalidos.length} registro(s) com data inválida foram ignorados aqui. Isso pode causar totais estranhos. Valores: ${invalidos.map(r=>`"${r.data}" (${fmt(r.bruto||0)})`).join(', ')}</div>`
+    : '';
   // líquido de cada ciclo = bruto - km*custoKmReal
   const chaves=Object.keys(porCiclo).sort();
   chaves.forEach(k=>{ porCiclo[k].custo = porCiclo[k].km*custoKmReal; porCiclo[k].liquido = porCiclo[k].bruto - porCiclo[k].custo; });
@@ -1168,6 +1175,7 @@ function renderEvolucao(registros) {
       </div>
     </div>`;
   }).join('');
+  document.getElementById('evolucao-list').innerHTML = avisoInvalidos + document.getElementById('evolucao-list').innerHTML;
 }
 
 function renderHistorico(registros) {
