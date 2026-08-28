@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rota Financeira</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Roboto+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14161A;
+    --card:#1E2126;
+    --card-2:#20242B;
+    --border:#2B2F37;
+    --yellow:#F4C43D;
+    --green:#3ECF8E;
+    --red:#FF6B5E;
+    --text:#ECEDEF;
+    --muted:#8A8F98;
+    --muted-2:#5C6068;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:18px 16px 60px;}
+  h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;letter-spacing:0.02em;}
+  .num{font-family:'Roboto Mono',monospace;}
+
+  /* header */
+  .lane{
+    height:6px;
+    background:repeating-linear-gradient(90deg,var(--yellow) 0 18px, transparent 18px 34px);
+    border-radius:3px;
+    margin-bottom:16px;
+    opacity:0.85;
+  }
+  header h1{font-size:22px;text-transform:uppercase;color:var(--text);}
+  header .sub{color:var(--muted);font-size:13px;margin-top:4px;}
+
+  /* gauge card */
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px;
+    margin-top:14px;
+  }
+  .card h2{font-size:13px;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;margin-bottom:12px;}
+  .gauge-row{display:flex;align-items:center;gap:16px;}
+  .gauge-num{font-size:40px;font-weight:700;line-height:1;}
+  .gauge-label{color:var(--muted);font-size:12px;margin-top:4px;}
+  svg.gauge{flex-shrink:0;}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+  .stat{background:var(--card-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+  .stat .v{font-size:16px;font-weight:700;}
+  .stat .l{font-size:11px;color:var(--muted);margin-top:2px;}
+  .pos{color:var(--green);}
+  .neg{color:var(--red);}
+
+  /* road timeline */
+  .road{position:relative;padding-left:28px;margin-top:8px;}
+  .road::before{
+    content:'';
+    position:absolute;left:9px;top:6px;bottom:6px;width:3px;
+    background:repeating-linear-gradient(180deg,var(--yellow) 0 10px, transparent 10px 20px);
+    opacity:0.7;
+  }
+  .marker{position:relative;padding:10px 0;border-bottom:1px solid var(--border);}
+  .marker:last-child{border-bottom:none;}
+  .marker::before{
+    content:'';
+    position:absolute;left:-28px;top:14px;width:20px;height:20px;
+    border-radius:4px;
+    background:var(--card-2);
+    border:2px solid var(--muted-2);
+  }
+  .marker.paid::before{background:var(--green);border-color:var(--green);}
+  .marker.late::before{background:var(--red);border-color:var(--red);}
+  .marker-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .marker-title{font-weight:600;font-size:14px;}
+  .marker-date{font-size:12px;color:var(--muted);}
+  .marker-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+  .marker-amt{font-size:15px;font-weight:700;}
+  .marker-meta{font-size:11px;color:var(--muted-2);}
+  .paidbtn{
+    font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--muted-2);
+    background:transparent;color:var(--muted);cursor:pointer;
+  }
+  .marker.paid .paidbtn{border-color:var(--green);color:var(--green);}
+
+  /* form */
+  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;}
+  select,input[type=number]{
+    width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--border);
+    background:var(--card-2);color:var(--text);font-size:15px;font-family:'Inter',sans-serif;
+  }
+  select:focus,input:focus{outline:2px solid var(--yellow);outline-offset:1px;}
+  .daytype{display:inline-block;margin-top:8px;font-size:12px;padding:4px 10px;border-radius:20px;background:var(--card-2);border:1px solid var(--border);color:var(--yellow);}
+  .btn{
+    width:100%;margin-top:16px;padding:13px;border-radius:10px;border:none;
+    background:var(--yellow);color:#1a1a1a;font-family:'Oswald',sans-serif;
+    font-size:15px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer;
+  }
+  .btn:active{opacity:0.85;}
+  .btn.secondary{background:transparent;border:1px solid var(--border);color:var(--muted);text-transform:none;font-family:'Inter',sans-serif;font-weight:500;font-size:13px;padding:10px;}
+
+  /* diary */
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
+  th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  td{padding:9px 4px;border-bottom:1px solid var(--border);}
+  td.r{text-align:right;}
+  .empty{color:var(--muted-2);font-size:13px;text-align:center;padding:20px 0;}
+  .del{color:var(--muted-2);background:none;border:none;font-size:16px;cursor:pointer;padding:0 4px;}
+
+  .foot-note{font-size:11px;color:var(--muted-2);margin-top:18px;line-height:1.5;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lane"></div>
+  <header>
+    <h1>Rota Financeira</h1>
+    <div class="sub">24/08 → 21/09 · meta diária de Uber + pizzaria pra fechar as contas de setembro</div>
+  </header>
+
+  <div class="card">
+    <h2>Ritmo até hoje</h2>
+    <div class="gauge-row">
+      <svg class="gauge" width="104" height="104" viewBox="0 0 104 104">
+        <circle cx="52" cy="52" r="44" fill="none" stroke="#2B2F37" stroke-width="10"/>
+        <circle id="gaugeArc" cx="52" cy="52" r="44" fill="none" stroke="#F4C43D" stroke-width="10"
+          stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="276.5"
+          transform="rotate(-90 52 52)"/>
+        <text id="gaugePct" x="52" y="58" text-anchor="middle" font-family="Roboto Mono" font-size="20" font-weight="700" fill="#ECEDEF">0%</text>
+      </svg>
+      <div>
+        <div class="gauge-num num" id="earnedToDate">R$ 0</div>
+        <div class="gauge-label">rodado até hoje</div>
+        <div class="gauge-num num" style="font-size:20px;color:var(--muted);margin-top:8px;" id="targetToDate">meta: R$ 0</div>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><div class="v num" id="diffToDate">R$ 0</div><div class="l">diferença até hoje</div></div>
+      <div class="stat"><div class="v num" id="cashNow">R$ 0</div><div class="l">saldo em caixa projetado</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Marcos da estrada</h2>
+    <div class="road" id="roadList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Registrar o dia</h2>
+    <label for="dateSel">Data</label>
+    <select id="dateSel"></select>
+    <div class="daytype" id="dayTypeTag">—</div>
+
+    <label for="uberInp">Ganho de Uber (R$)</label>
+    <input type="number" id="uberInp" min="0" step="1" placeholder="0">
+
+    <label for="extraInp">Outras receitas — pizzaria etc (R$)</label>
+    <input type="number" id="extraInp" min="0" step="1" placeholder="0">
+
+    <label for="foodInp">Gasto com comida (R$)</label>
+    <input type="number" id="foodInp" min="0" step="1" placeholder="40">
+
+    <button class="btn" id="saveBtn">Salvar dia</button>
+    <div id="saveStatus" style="margin-top:10px;font-size:12px;text-align:center;min-height:16px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Diário</h2>
+    <table id="diaryTable">
+      <thead>
+        <tr><th>Dia</th><th class="r">Meta</th><th class="r">Uber</th><th class="r">Dif.</th><th></th></tr>
+      </thead>
+      <tbody id="diaryBody"></tbody>
+    </table>
+    <div class="empty" id="diaryEmpty">Nenhum dia registrado ainda.</div>
+  </div>
+
+  <button class="btn secondary" id="resetBtn">Zerar todos os dados</button>
+
+  <div class="foot-note">
+    Meta diária: seg–qui R$ 300 · sex–dom (por causa da pizzaria à noite) R$ 185.<br>
+    Já inclui R$ 40/dia de comida, luz+internet e a meta de guardar R$ 300/semana. O rancho aqui é o que sobra (≈R$322,53 no total, dividido em 3x) — não é mais um valor fixo. Reserva de emergência (R$ 600) fica fora dessa conta.
+  </div>
+
+</div>
+
+<script>
+// Shim: substitui window.storage (exclusivo do Claude) por localStorage,
+// pra esse artefato funcionar em qualquer navegador/hospedagem normal.
+window.storage = {
+  async get(key){
+    const raw = localStorage.getItem(key);
+    if(raw === null) return null;
+    return { key, value: raw, shared: false };
+  },
+  async set(key, value){
+    localStorage.setItem(key, value);
+    return { key, value, shared: false };
+  },
+  async delete(key){
+    localStorage.removeItem(key);
+    return { key, deleted: true, shared: false };
+  },
+  async list(prefix){
+    const keys = Object.keys(localStorage).filter(k => !prefix || k.startsWith(prefix));
+    return { keys, prefix, shared: false };
+  }
+};
+
+const CHEIO = 300, PARCIAL = 185;
+const SALDO_INICIAL = 522.53;
+const START = new Date(2026,7,24); // 24 ago 2026
+const END = new Date(2026,8,21);   // 21 set 2026
+const PIZZARIA_DATE = '2026-09-07';
+const PIZZARIA_VALOR = 1500;
+
+const CHECKPOINTS = [
+  {id:'divida',    date:'2026-08-28', label:'Dívida da semana', amount:600},
+  {id:'rancho1',   date:'2026-08-29', label:'Rancho (1/3)', amount:107.51},
+  {id:'nubank',    date:'2026-09-05', label:'Fatura Nubank', amount:2300},
+  {id:'rancho2',   date:'2026-09-09', label:'Rancho (2/3)', amount:107.51},
+  {id:'mp',        date:'2026-09-12', label:'Fatura Mercado Pago', amount:187},
+  {id:'luzinternet',date:'2026-09-12', label:'Luz + Internet', amount:250},
+  {id:'aluguel',   date:'2026-09-18', label:'Aluguel', amount:1000},
+  {id:'rancho3',   date:'2026-09-19', label:'Rancho (3/3)', amount:107.51},
+  {id:'carro',     date:'2026-09-20', label:'Parcela do carro', amount:2223},
+  {id:'agua',      date:'2026-09-21', label:'Conta de água', amount:100},
+];
+
+function fmt(n){
+  const v = Math.round((n||0)*100)/100;
+  const sign = v < 0 ? '-' : '';
+  return sign + 'R$ ' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function toKey(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function dayType(d){
+  const wd = d.getDay(); // 0 dom .. 6 sab
+  return (wd===0||wd===5||wd===6) ? 'parcial' : 'cheio';
+}
+const WD_ABBR = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+// build the full date list
+const DATES = [];
+for(let d=new Date(START); d<=END; d.setDate(d.getDate()+1)){
+  DATES.push(new Date(d));
+}
+
+// populate date select
+const dateSel = document.getElementById('dateSel');
+DATES.forEach(d=>{
+  const key = toKey(d);
+  const type = dayType(d);
+  const target = type==='cheio' ? CHEIO : PARCIAL;
+  const opt = document.createElement('option');
+  opt.value = key;
+  opt.textContent = `${WD_ABBR[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} — ${type==='cheio'?'Cheio':'Parcial'} (R$ ${target})`;
+  dateSel.appendChild(opt);
+});
+
+function defaultSelectedDate(){
+  const today = new Date();
+  const key = toKey(today);
+  const found = DATES.find(d=>toKey(d)===key);
+  return found ? key : toKey(DATES[0]);
+}
+dateSel.value = defaultSelectedDate();
+
+function updateFormForDate(){
+  const key = dateSel.value;
+  const d = DATES.find(x=>toKey(x)===key);
+  const type = dayType(d);
+  const target = type==='cheio' ? CHEIO : PARCIAL;
+  document.getElementById('dayTypeTag').textContent = `${type==='cheio'?'Dia cheio':'Dia parcial'} · meta R$ ${target}`;
+  window.storage.get('entry:'+key).then(r=>{
+    const val = r ? JSON.parse(r.value) : null;
+    document.getElementById('uberInp').value = val ? val.uber : '';
+    document.getElementById('extraInp').value = val ? val.extra : (key===PIZZARIA_DATE ? PIZZARIA_VALOR : '');
+    document.getElementById('foodInp').value = val ? val.food : 40;
+  }).catch(()=>{
+    document.getElementById('uberInp').value = '';
+    document.getElementById('extraInp').value = key===PIZZARIA_DATE ? PIZZARIA_VALOR : '';
+    document.getElementById('foodInp').value = 40;
+  });
+}
+dateSel.addEventListener('change', updateFormForDate);
+updateFormForDate();
+
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('saveStatus');
+  const btn = document.getElementById('saveBtn');
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Salvando...';
+  btn.disabled = true;
+
+  if(typeof window.storage === 'undefined'){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Erro: window.storage não está disponível neste ambiente.';
+    btn.disabled = false;
+    return;
+  }
+
+  const key = dateSel.value;
+  const uber = parseFloat(document.getElementById('uberInp').value)||0;
+  const extra = parseFloat(document.getElementById('extraInp').value)||0;
+  const food = parseFloat(document.getElementById('foodInp').value)||0;
+  try{
+    const result = await window.storage.set('entry:'+key, JSON.stringify({uber,extra,food}));
+    if(!result){
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = 'Erro: o storage retornou vazio ao salvar.';
+      btn.disabled = false;
+      return;
+    }
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = 'Salvo ✓ (' + key + ')';
+    await renderAll();
+  }catch(e){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : String(e));
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+async function getAllEntries(){
+  const out = {};
+  try{
+    const list = await window.storage.list('entry:');
+    if(list && list.keys){
+      for(const k of list.keys){
+        try{
+          const r = await window.storage.get(k);
+          if(r) out[k.replace('entry:','')] = JSON.parse(r.value);
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+  return out;
+}
+
+async function getPaidBills(){
+  const paid = {};
+  for(const cp of CHECKPOINTS){
+    try{
+      const r = await window.storage.get('billpaid:'+cp.id);
+      paid[cp.id] = r ? JSON.parse(r.value) : false;
+    }catch(e){ paid[cp.id] = false; }
+  }
+  return paid;
+}
+
+async function renderRoad(){
+  const paid = await getPaidBills();
+  const today = toKey(new Date());
+  const roadList = document.getElementById('roadList');
+  roadList.innerHTML = '';
+
+  // cumulative target-to-date for reference on each checkpoint
+  let cum = 0;
+  const cumByDate = {};
+  DATES.forEach(d=>{
+    const key = toKey(d);
+    cum += dayType(d)==='cheio' ? CHEIO : PARCIAL;
+    cumByDate[key] = cum;
+  });
+
+  CHECKPOINTS.forEach(cp=>{
+    const isPaid = paid[cp.id];
+    const isLate = !isPaid && cp.date < today;
+    const div = document.createElement('div');
+    div.className = 'marker' + (isPaid ? ' paid' : (isLate ? ' late' : ''));
+    const [y,m,dd] = cp.date.split('-');
+    div.innerHTML = `
+      <div class="marker-top">
+        <div class="marker-title">${cp.label}</div>
+        <div class="marker-date">${dd}/${m}</div>
+      </div>
+      <div class="marker-bottom">
+        <div class="marker-amt">${fmt(cp.amount)}</div>
+        <button class="paidbtn" data-id="${cp.id}">${isPaid ? 'Paga' : 'Marcar paga'}</button>
+      </div>
+      <div class="marker-meta">meta de Uber acumulada até aqui: ${fmt(cumByDate[cp.date])}</div>
+    `;
+    roadList.appendChild(div);
+  });
+
+  roadList.querySelectorAll('.paidbtn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.id;
+      const cur = paid[id];
+      await window.storage.set('billpaid:'+id, JSON.stringify(!cur));
+      renderRoad();
+    });
+  });
+}
+
+async function renderDiary(entries){
+  const body = document.getElementById('diaryBody');
+  const empty = document.getElementById('diaryEmpty');
+  body.innerHTML = '';
+  const keys = Object.keys(entries).sort().reverse();
+  if(keys.length===0){ empty.style.display='block'; document.getElementById('diaryTable').style.display='none'; return; }
+  empty.style.display='none';
+  document.getElementById('diaryTable').style.display='table';
+
+  keys.forEach(key=>{
+    const d = DATES.find(x=>toKey(x)===key);
+    if(!d) return;
+    const type = dayType(d);
+    const target = type==='cheio' ? CHEIO : PARCIAL;
+    const e = entries[key];
+    const diff = (e.uber||0) - target;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${WD_ABBR[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}</td>
+      <td class="r num">${fmt(target)}</td>
+      <td class="r num">${fmt(e.uber||0)}</td>
+      <td class="r num ${diff>=0?'pos':'neg'}">${diff>=0?'+':''}${fmt(diff)}</td>
+      <td><button class="del" data-key="${key}">✕</button></td>
+    `;
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll('.del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      await window.storage.delete('entry:'+btn.dataset.key);
+      await renderAll();
+    });
+  });
+}
+
+async function renderGauge(entries){
+  const today = new Date();
+  const todayKey = toKey(today);
+  let clampedTodayKey = todayKey;
+  if(todayKey < toKey(START)) clampedTodayKey = toKey(START);
+  if(todayKey > toKey(END)) clampedTodayKey = toKey(END);
+
+  let targetToDate = 0;
+  DATES.forEach(d=>{
+    const key = toKey(d);
+    if(key <= clampedTodayKey){
+      targetToDate += dayType(d)==='cheio' ? CHEIO : PARCIAL;
+    }
+  });
+
+  let earnedToDate = 0, earnedTotal = 0, extraTotal = 0, foodTotal = 0;
+  Object.keys(entries).forEach(key=>{
+    const e = entries[key];
+    earnedTotal += (e.uber||0);
+    extraTotal += (e.extra||0);
+    foodTotal += (e.food||0);
+    if(key <= clampedTodayKey) earnedToDate += (e.uber||0);
+  });
+
+  const pct = targetToDate>0 ? Math.min(999, Math.round((earnedToDate/targetToDate)*100)) : 0;
+  const diff = earnedToDate - targetToDate;
+
+  document.getElementById('earnedToDate').textContent = fmt(earnedToDate);
+  document.getElementById('targetToDate').textContent = 'meta: ' + fmt(targetToDate);
+  const diffEl = document.getElementById('diffToDate');
+  diffEl.textContent = (diff>=0?'+':'') + fmt(diff);
+  diffEl.className = 'v num ' + (diff>=0?'pos':'neg');
+
+  const circumference = 2*Math.PI*44;
+  const arc = document.getElementById('gaugeArc');
+  const clampedPct = Math.min(100,Math.max(0,pct));
+  arc.setAttribute('stroke-dasharray', circumference);
+  arc.setAttribute('stroke-dashoffset', circumference - (circumference*clampedPct/100));
+  arc.setAttribute('stroke', pct>=100 ? '#3ECF8E' : (pct>=70 ? '#F4C43D' : '#FF6B5E'));
+  document.getElementById('gaugePct').textContent = pct + '%';
+
+  // caixa projetado = saldo inicial + tudo que entrou (uber+extra) - toda comida gasta
+  // (contas marcadas como pagas ainda não abatidas aqui pra manter simples;
+  //  contas em aberto continuam contando como responsabilidade futura)
+  const paid = await getPaidBills();
+  let billsPaidTotal = 0;
+  CHECKPOINTS.forEach(cp=>{ if(paid[cp.id]) billsPaidTotal += cp.amount; });
+
+  const cashNow = SALDO_INICIAL + earnedTotal + extraTotal - foodTotal - billsPaidTotal;
+  const cashEl = document.getElementById('cashNow');
+  cashEl.textContent = fmt(cashNow);
+  cashEl.className = 'v num ' + (cashNow>=0?'pos':'neg');
+}
+
+async function renderAll(){
+  const entries = await getAllEntries();
+  await renderGauge(entries);
+  await renderDiary(entries);
+  await renderRoad();
+}
+
+document.getElementById('resetBtn').addEventListener('click', async ()=>{
+  if(!confirm('Isso apaga todos os dias registrados e o status das contas. Confirma?')) return;
+  const list = await window.storage.list('entry:').catch(()=>null);
+  if(list && list.keys){ for(const k of list.keys){ await window.storage.delete(k).catch(()=>{}); } }
+  for(const cp of CHECKPOINTS){ await window.storage.delete('billpaid:'+cp.id).catch(()=>{}); }
+  await renderAll();
+  updateFormForDate();
+});
+
+renderAll();
+</script>
+</body>
+</html>
