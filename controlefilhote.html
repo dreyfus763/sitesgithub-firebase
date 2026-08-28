@@ -8,426 +8,612 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Roboto+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#14161A;
-    --card:#1E2126;
-    --card-2:#20242B;
-    --border:#2B2F37;
-    --yellow:#F4C43D;
-    --green:#3ECF8E;
-    --red:#FF6B5E;
-    --text:#ECEDEF;
-    --muted:#8A8F98;
-    --muted-2:#5C6068;
+    --bg:#14161A; --card:#1E2126; --card-2:#20242B; --border:#2B2F37;
+    --yellow:#F4C43D; --green:#3ECF8E; --red:#FF6B5E;
+    --text:#ECEDEF; --muted:#8A8F98; --muted-2:#5C6068;
   }
   *{box-sizing:border-box;}
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--text);
-    font-family:'Inter',system-ui,sans-serif;
-    -webkit-tap-highlight-color:transparent;
-  }
-  .wrap{max-width:520px;margin:0 auto;padding:18px 16px 60px;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;-webkit-tap-highlight-color:transparent;}
+  .wrap{max-width:520px;margin:0 auto;padding:14px 16px 60px;}
   h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;letter-spacing:0.02em;}
   .num{font-family:'Roboto Mono',monospace;}
+  .lane{height:6px;background:repeating-linear-gradient(90deg,var(--yellow) 0 18px, transparent 18px 34px);border-radius:3px;margin-bottom:12px;opacity:0.85;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  header h1{font-size:20px;text-transform:uppercase;}
+  #cloud-status{font-size:11px;color:var(--muted);margin-top:2px;}
 
-  /* header */
-  .lane{
-    height:6px;
-    background:repeating-linear-gradient(90deg,var(--yellow) 0 18px, transparent 18px 34px);
-    border-radius:3px;
-    margin-bottom:16px;
-    opacity:0.85;
-  }
-  header h1{font-size:22px;text-transform:uppercase;color:var(--text);}
-  header .sub{color:var(--muted);font-size:13px;margin-top:4px;}
+  /* tabs */
+  .tabs{display:flex;gap:3px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:3px;margin:14px 0;overflow-x:auto;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{flex:0 0 auto;padding:8px 12px;font-size:12px;cursor:pointer;border-radius:9px;color:var(--muted);border:none;background:none;font-family:'Inter',sans-serif;font-weight:600;white-space:nowrap;}
+  .tab.active{background:var(--yellow);color:#1a1a1a;}
+  .panel{display:none;}
+  .panel.active{display:block;}
 
-  /* gauge card */
-  .card{
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:18px;
-    margin-top:14px;
-  }
-  .card h2{font-size:13px;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;margin-bottom:12px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-top:12px;}
+  .card h2{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;margin-bottom:12px;}
   .gauge-row{display:flex;align-items:center;gap:16px;}
-  .gauge-num{font-size:40px;font-weight:700;line-height:1;}
+  .gauge-num{font-size:36px;font-weight:700;line-height:1;}
   .gauge-label{color:var(--muted);font-size:12px;margin-top:4px;}
   svg.gauge{flex-shrink:0;}
-
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
   .stat{background:var(--card-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
   .stat .v{font-size:16px;font-weight:700;}
   .stat .l{font-size:11px;color:var(--muted);margin-top:2px;}
-  .pos{color:var(--green);}
-  .neg{color:var(--red);}
+  .pos{color:var(--green);} .neg{color:var(--red);}
 
-  /* road timeline */
-  .road{position:relative;padding-left:28px;margin-top:8px;}
-  .road::before{
-    content:'';
-    position:absolute;left:9px;top:6px;bottom:6px;width:3px;
-    background:repeating-linear-gradient(180deg,var(--yellow) 0 10px, transparent 10px 20px);
-    opacity:0.7;
-  }
+  .road{position:relative;padding-left:26px;margin-top:6px;}
+  .road::before{content:'';position:absolute;left:9px;top:6px;bottom:6px;width:3px;background:repeating-linear-gradient(180deg,var(--yellow) 0 10px, transparent 10px 20px);opacity:0.7;}
   .marker{position:relative;padding:10px 0;border-bottom:1px solid var(--border);}
   .marker:last-child{border-bottom:none;}
-  .marker::before{
-    content:'';
-    position:absolute;left:-28px;top:14px;width:20px;height:20px;
-    border-radius:4px;
-    background:var(--card-2);
-    border:2px solid var(--muted-2);
-  }
+  .marker::before{content:'';position:absolute;left:-26px;top:14px;width:18px;height:18px;border-radius:4px;background:var(--card-2);border:2px solid var(--muted-2);}
   .marker.paid::before{background:var(--green);border-color:var(--green);}
   .marker.late::before{background:var(--red);border-color:var(--red);}
   .marker-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
   .marker-title{font-weight:600;font-size:14px;}
   .marker-date{font-size:12px;color:var(--muted);}
-  .marker-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+  .marker-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:6px;}
   .marker-amt{font-size:15px;font-weight:700;}
-  .marker-meta{font-size:11px;color:var(--muted-2);}
-  .paidbtn{
-    font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--muted-2);
-    background:transparent;color:var(--muted);cursor:pointer;
-  }
-  .marker.paid .paidbtn{border-color:var(--green);color:var(--green);}
+  .marker-actions{display:flex;gap:6px;}
+  .icon-btn{font-size:11px;padding:4px 9px;border-radius:16px;border:1px solid var(--muted-2);background:transparent;color:var(--muted);cursor:pointer;}
+  .icon-btn.paidbtn.on{border-color:var(--green);color:var(--green);}
+  .icon-btn.del{border-color:rgba(255,107,94,0.4);color:var(--red);}
 
-  /* form */
   label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;}
-  select,input[type=number]{
+  select,input[type=number],input[type=date],input[type=text]{
     width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--border);
     background:var(--card-2);color:var(--text);font-size:15px;font-family:'Inter',sans-serif;
   }
   select:focus,input:focus{outline:2px solid var(--yellow);outline-offset:1px;}
   .daytype{display:inline-block;margin-top:8px;font-size:12px;padding:4px 10px;border-radius:20px;background:var(--card-2);border:1px solid var(--border);color:var(--yellow);}
-  .btn{
-    width:100%;margin-top:16px;padding:13px;border-radius:10px;border:none;
-    background:var(--yellow);color:#1a1a1a;font-family:'Oswald',sans-serif;
-    font-size:15px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer;
-  }
+  .btn{width:100%;margin-top:16px;padding:13px;border-radius:10px;border:none;background:var(--yellow);color:#1a1a1a;font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer;}
   .btn:active{opacity:0.85;}
+  .btn:disabled{opacity:0.5;}
   .btn.secondary{background:transparent;border:1px solid var(--border);color:var(--muted);text-transform:none;font-family:'Inter',sans-serif;font-weight:500;font-size:13px;padding:10px;}
+  .btn.danger{background:transparent;border:1px solid rgba(255,107,94,0.4);color:var(--red);text-transform:none;font-family:'Inter',sans-serif;font-weight:500;font-size:13px;padding:10px;}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  #saveStatus,#entryStatus,#cpStatus,#cfgStatus{margin-top:10px;font-size:12px;text-align:center;min-height:16px;}
 
-  /* diary */
   table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
   th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--border);}
   td{padding:9px 4px;border-bottom:1px solid var(--border);}
   td.r{text-align:right;}
   .empty{color:var(--muted-2);font-size:13px;text-align:center;padding:20px 0;}
   .del{color:var(--muted-2);background:none;border:none;font-size:16px;cursor:pointer;padding:0 4px;}
-
   .foot-note{font-size:11px;color:var(--muted-2);margin-top:18px;line-height:1.5;text-align:center;}
 </style>
 </head>
 <body>
 <div class="wrap">
-
   <div class="lane"></div>
   <header>
-    <h1>Rota Financeira</h1>
-    <div class="sub">24/08 → 21/09 · meta diária de Uber + pizzaria pra fechar as contas de setembro</div>
+    <div>
+      <h1>Rota Financeira</h1>
+      <div id="cloud-status">Conectando...</div>
+    </div>
   </header>
 
-  <div class="card">
-    <h2>Ritmo até hoje</h2>
-    <div class="gauge-row">
-      <svg class="gauge" width="104" height="104" viewBox="0 0 104 104">
-        <circle cx="52" cy="52" r="44" fill="none" stroke="#2B2F37" stroke-width="10"/>
-        <circle id="gaugeArc" cx="52" cy="52" r="44" fill="none" stroke="#F4C43D" stroke-width="10"
-          stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="276.5"
-          transform="rotate(-90 52 52)"/>
-        <text id="gaugePct" x="52" y="58" text-anchor="middle" font-family="Roboto Mono" font-size="20" font-weight="700" fill="#ECEDEF">0%</text>
-      </svg>
-      <div>
-        <div class="gauge-num num" id="earnedToDate">R$ 0</div>
-        <div class="gauge-label">rodado até hoje</div>
-        <div class="gauge-num num" style="font-size:20px;color:var(--muted);margin-top:8px;" id="targetToDate">meta: R$ 0</div>
+  <div class="tabs">
+    <button class="tab active" data-tab="resumo">Resumo</button>
+    <button class="tab" data-tab="diario">Diário</button>
+    <button class="tab" data-tab="contas">Contas</button>
+    <button class="tab" data-tab="config">Config</button>
+  </div>
+
+  <!-- RESUMO -->
+  <div id="tab-resumo" class="panel active">
+    <div class="card">
+      <h2>Ritmo até hoje</h2>
+      <div class="gauge-row">
+        <svg class="gauge" width="96" height="96" viewBox="0 0 104 104">
+          <circle cx="52" cy="52" r="44" fill="none" stroke="#2B2F37" stroke-width="10"/>
+          <circle id="gaugeArc" cx="52" cy="52" r="44" fill="none" stroke="#F4C43D" stroke-width="10" stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="276.5" transform="rotate(-90 52 52)"/>
+          <text id="gaugePct" x="52" y="58" text-anchor="middle" font-family="Roboto Mono" font-size="19" font-weight="700" fill="#ECEDEF">0%</text>
+        </svg>
+        <div>
+          <div class="gauge-num num" id="earnedToDate">R$ 0</div>
+          <div class="gauge-label">rodado até hoje</div>
+          <div class="gauge-num num" style="font-size:18px;color:var(--muted);margin-top:6px;" id="targetToDate">meta: R$ 0</div>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat"><div class="v num" id="diffToDate">R$ 0</div><div class="l">diferença até hoje</div></div>
+        <div class="stat"><div class="v num" id="cashNow">R$ 0</div><div class="l">saldo em caixa projetado</div></div>
       </div>
     </div>
-    <div class="stat-grid">
-      <div class="stat"><div class="v num" id="diffToDate">R$ 0</div><div class="l">diferença até hoje</div></div>
-      <div class="stat"><div class="v num" id="cashNow">R$ 0</div><div class="l">saldo em caixa projetado</div></div>
+
+    <div class="card">
+      <h2>Marcos da estrada</h2>
+      <div class="road" id="roadList"></div>
     </div>
   </div>
 
-  <div class="card">
-    <h2>Marcos da estrada</h2>
-    <div class="road" id="roadList"></div>
+  <!-- DIARIO -->
+  <div id="tab-diario" class="panel">
+    <div class="card">
+      <h2>Registrar o dia</h2>
+      <label for="dateSel">Data</label>
+      <select id="dateSel"></select>
+      <div class="daytype" id="dayTypeTag">—</div>
+      <label for="uberInp">Ganho de Uber (R$)</label>
+      <input type="number" id="uberInp" min="0" step="1" placeholder="0">
+      <label for="extraInp">Outras receitas (R$)</label>
+      <input type="number" id="extraInp" min="0" step="1" placeholder="0">
+      <label for="foodInp">Gasto com comida (R$)</label>
+      <input type="number" id="foodInp" min="0" step="1" placeholder="0">
+      <button class="btn" id="saveBtn">Salvar dia</button>
+      <div id="entryStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Diário</h2>
+      <table id="diaryTable">
+        <thead><tr><th>Dia</th><th class="r">Meta</th><th class="r">Uber</th><th class="r">Dif.</th><th></th></tr></thead>
+        <tbody id="diaryBody"></tbody>
+      </table>
+      <div class="empty" id="diaryEmpty">Nenhum dia registrado ainda.</div>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Registrar o dia</h2>
-    <label for="dateSel">Data</label>
-    <select id="dateSel"></select>
-    <div class="daytype" id="dayTypeTag">—</div>
-
-    <label for="uberInp">Ganho de Uber (R$)</label>
-    <input type="number" id="uberInp" min="0" step="1" placeholder="0">
-
-    <label for="extraInp">Outras receitas — pizzaria etc (R$)</label>
-    <input type="number" id="extraInp" min="0" step="1" placeholder="0">
-
-    <label for="foodInp">Gasto com comida (R$)</label>
-    <input type="number" id="foodInp" min="0" step="1" placeholder="40">
-
-    <button class="btn" id="saveBtn">Salvar dia</button>
-    <div id="saveStatus" style="margin-top:10px;font-size:12px;text-align:center;min-height:16px;"></div>
+  <!-- CONTAS -->
+  <div id="tab-contas" class="panel">
+    <div class="card">
+      <h2 id="cpFormTitle">Nova despesa</h2>
+      <input type="hidden" id="cpEditId" value="">
+      <label for="cpLabel">Descrição</label>
+      <input type="text" id="cpLabel" placeholder="ex: Aluguel">
+      <div class="form-row">
+        <div>
+          <label for="cpDate">Data</label>
+          <input type="date" id="cpDate">
+        </div>
+        <div>
+          <label for="cpAmount">Valor (R$)</label>
+          <input type="number" id="cpAmount" min="0" step="0.01" placeholder="0">
+        </div>
+      </div>
+      <button class="btn" id="cpSaveBtn">Salvar despesa</button>
+      <button class="btn secondary" id="cpCancelBtn" style="display:none;">Cancelar edição</button>
+      <div id="cpStatus"></div>
+    </div>
+    <div class="card">
+      <h2>Todas as despesas</h2>
+      <div class="road" id="cpList"></div>
+      <div class="empty" id="cpEmpty" style="display:none;">Nenhuma despesa cadastrada.</div>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Diário</h2>
-    <table id="diaryTable">
-      <thead>
-        <tr><th>Dia</th><th class="r">Meta</th><th class="r">Uber</th><th class="r">Dif.</th><th></th></tr>
-      </thead>
-      <tbody id="diaryBody"></tbody>
-    </table>
-    <div class="empty" id="diaryEmpty">Nenhum dia registrado ainda.</div>
+  <!-- CONFIG -->
+  <div id="tab-config" class="panel">
+    <div class="card">
+      <h2>Metas diárias</h2>
+      <div class="form-row">
+        <div>
+          <label for="cfgCheio">Dia cheio (R$)</label>
+          <input type="number" id="cfgCheio" min="0" step="1">
+        </div>
+        <div>
+          <label for="cfgParcial">Dia parcial (R$)</label>
+          <input type="number" id="cfgParcial" min="0" step="1">
+        </div>
+      </div>
+      <label style="margin-top:14px;">Dias considerados "parciais" (o resto é dia cheio)</label>
+      <div id="weekdayPicker" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"></div>
+    </div>
+    <div class="card">
+      <h2>Saldo e período</h2>
+      <label for="cfgSaldo">Saldo inicial em caixa (R$)</label>
+      <input type="number" id="cfgSaldo" step="0.01">
+      <div class="form-row">
+        <div>
+          <label for="cfgStart">Início da rota</label>
+          <input type="date" id="cfgStart">
+        </div>
+        <div>
+          <label for="cfgEnd">Fim da rota</label>
+          <input type="date" id="cfgEnd">
+        </div>
+      </div>
+      <button class="btn" id="cfgSaveBtn">Salvar configurações</button>
+      <div id="cfgStatus"></div>
+    </div>
+    <div class="card">
+      <h2 style="color:var(--red);">Zerar dados</h2>
+      <button class="btn danger" id="resetBtn">Apagar tudo da nuvem</button>
+    </div>
   </div>
 
-  <button class="btn secondary" id="resetBtn">Zerar todos os dados</button>
-
-  <div class="foot-note">
-    Meta diária: seg–qui R$ 300 · sex–dom (por causa da pizzaria à noite) R$ 185.<br>
-    Já inclui R$ 40/dia de comida, luz+internet e a meta de guardar R$ 300/semana. O rancho aqui é o que sobra (≈R$322,53 no total, dividido em 3x) — não é mais um valor fixo. Reserva de emergência (R$ 600) fica fora dessa conta.
-  </div>
-
+  <div class="foot-note">Todos os valores, despesas e datas agora são editáveis pela tela. Os dados ficam salvos na nuvem (Firebase) e sincronizam entre qualquer aparelho.</div>
 </div>
 
 <script>
-// Shim: substitui window.storage (exclusivo do Claude) por localStorage,
-// pra esse artefato funcionar em qualquer navegador/hospedagem normal.
-window.storage = {
-  async get(key){
-    const raw = localStorage.getItem(key);
-    if(raw === null) return null;
-    return { key, value: raw, shared: false };
-  },
-  async set(key, value){
-    localStorage.setItem(key, value);
-    return { key, value, shared: false };
-  },
-  async delete(key){
-    localStorage.removeItem(key);
-    return { key, deleted: true, shared: false };
-  },
-  async list(prefix){
-    const keys = Object.keys(localStorage).filter(k => !prefix || k.startsWith(prefix));
-    return { keys, prefix, shared: false };
-  }
+// ===== FIREBASE REST (mesmo padrão do app do motorista) =====
+const FIREBASE_DB_URL = 'https://base-de-dados-dashboard-12ac2-default-rtdb.firebaseio.com';
+const DB_PATH = 'rotafinanceira';
+const CACHE_KEY = 'rotafinanceira_cache';
+
+function setStatus(msg, color){
+  const el = document.getElementById('cloud-status');
+  if(el){ el.textContent = msg; el.style.color = color || '#8A8F98'; }
+}
+function fbUrl(path){ return FIREBASE_DB_URL.replace(/\/$/, '') + '/' + path + '.json'; }
+async function fbGet(path){
+  const res = await fetch(fbUrl(path), { method:'GET', cache:'no-store' });
+  if(!res.ok) throw new Error('GET '+res.status);
+  return await res.json();
+}
+async function fbSet(path, data){
+  const res = await fetch(fbUrl(path), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  if(!res.ok) throw new Error('PUT '+res.status);
+  return await res.json();
+}
+function readCache(){ try{ return JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); }catch(e){ return null; } }
+function writeCache(data){ try{ localStorage.setItem(CACHE_KEY, JSON.stringify(data)); }catch(e){} }
+
+// ===== ESTADO GLOBAL =====
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const TODAY = todayISO();
+
+let STATE = {
+  settings: { cheio:300, parcial:185, saldoInicial:0, partialWeekdays:[0,5,6], startDate: TODAY, endDate: null },
+  entries: {},     // { 'YYYY-MM-DD': {uber, extra, food} }
+  checkpoints: []  // [{id, date, label, amount, paid}]
 };
 
-const CHEIO = 300, PARCIAL = 185;
-const SALDO_INICIAL = 522.53;
-const START = new Date(2026,7,24); // 24 ago 2026
-const END = new Date(2026,8,21);   // 21 set 2026
-const PIZZARIA_DATE = '2026-09-07';
-const PIZZARIA_VALOR = 1500;
+function defaultEndDate(){
+  const d = new Date(); d.setDate(d.getDate()+45);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 
-const CHECKPOINTS = [
-  {id:'divida',    date:'2026-08-28', label:'Dívida da semana', amount:600},
-  {id:'rancho1',   date:'2026-08-29', label:'Rancho (1/3)', amount:107.51},
-  {id:'nubank',    date:'2026-09-05', label:'Fatura Nubank', amount:2300},
-  {id:'rancho2',   date:'2026-09-09', label:'Rancho (2/3)', amount:107.51},
-  {id:'mp',        date:'2026-09-12', label:'Fatura Mercado Pago', amount:187},
-  {id:'luzinternet',date:'2026-09-12', label:'Luz + Internet', amount:250},
-  {id:'aluguel',   date:'2026-09-18', label:'Aluguel', amount:1000},
-  {id:'rancho3',   date:'2026-09-19', label:'Rancho (3/3)', amount:107.51},
-  {id:'carro',     date:'2026-09-20', label:'Parcela do carro', amount:2223},
-  {id:'agua',      date:'2026-09-21', label:'Conta de água', amount:100},
-];
+async function loadAll(){
+  setStatus('Carregando...', '#8A8F98');
+  const cached = readCache();
+  if(cached){ STATE = mergeState(cached); renderAll(); }
+  try{
+    const d = await fbGet(DB_PATH);
+    if(d && typeof d === 'object'){
+      STATE = mergeState(d);
+      writeCache(STATE);
+    } else if(!cached){
+      // nada na nuvem ainda: usa padrão e já salva
+      STATE.settings.endDate = STATE.settings.endDate || defaultEndDate();
+      await saveAll();
+    }
+    setStatus('☁️ Sincronizado', '#3ECF8E');
+  }catch(e){
+    setStatus(cached ? '⚠️ Offline — usando cache local' : '⚠️ Sem conexão', '#F4C43D');
+    if(!STATE.settings.endDate) STATE.settings.endDate = defaultEndDate();
+  }
+  renderAll();
+}
+
+function mergeState(d){
+  const s = d.settings || {};
+  return {
+    settings: {
+      cheio: s.cheio != null ? s.cheio : 300,
+      parcial: s.parcial != null ? s.parcial : 185,
+      saldoInicial: s.saldoInicial != null ? s.saldoInicial : 0,
+      partialWeekdays: Array.isArray(s.partialWeekdays) ? s.partialWeekdays : [0,5,6],
+      startDate: s.startDate || TODAY,
+      endDate: s.endDate || defaultEndDate()
+    },
+    entries: d.entries && typeof d.entries === 'object' ? d.entries : {},
+    checkpoints: Array.isArray(d.checkpoints) ? d.checkpoints : []
+  };
+}
+
+async function saveAll(){
+  writeCache(STATE);
+  try{
+    await fbSet(DB_PATH, STATE);
+    setStatus('☁️ Sincronizado', '#3ECF8E');
+    return true;
+  }catch(e){
+    setStatus('⚠️ Salvo localmente (sem internet)', '#F4C43D');
+    return false;
+  }
+}
 
 function fmt(n){
   const v = Math.round((n||0)*100)/100;
   const sign = v < 0 ? '-' : '';
   return sign + 'R$ ' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-function toKey(d){
-  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-}
-function dayType(d){
-  const wd = d.getDay(); // 0 dom .. 6 sab
-  return (wd===0||wd===5||wd===6) ? 'parcial' : 'cheio';
-}
 const WD_ABBR = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-
-// build the full date list
-const DATES = [];
-for(let d=new Date(START); d<=END; d.setDate(d.getDate()+1)){
-  DATES.push(new Date(d));
+function dayType(dateISO){
+  const wd = new Date(dateISO+'T12:00:00').getDay();
+  return STATE.settings.partialWeekdays.includes(wd) ? 'parcial' : 'cheio';
 }
-
-// populate date select
-const dateSel = document.getElementById('dateSel');
-DATES.forEach(d=>{
-  const key = toKey(d);
-  const type = dayType(d);
-  const target = type==='cheio' ? CHEIO : PARCIAL;
-  const opt = document.createElement('option');
-  opt.value = key;
-  opt.textContent = `${WD_ABBR[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} — ${type==='cheio'?'Cheio':'Parcial'} (R$ ${target})`;
-  dateSel.appendChild(opt);
-});
-
-function defaultSelectedDate(){
-  const today = new Date();
-  const key = toKey(today);
-  const found = DATES.find(d=>toKey(d)===key);
-  return found ? key : toKey(DATES[0]);
+function dayTarget(dateISO){
+  return dayType(dateISO)==='cheio' ? STATE.settings.cheio : STATE.settings.parcial;
 }
-dateSel.value = defaultSelectedDate();
-
-function updateFormForDate(){
-  const key = dateSel.value;
-  const d = DATES.find(x=>toKey(x)===key);
-  const type = dayType(d);
-  const target = type==='cheio' ? CHEIO : PARCIAL;
-  document.getElementById('dayTypeTag').textContent = `${type==='cheio'?'Dia cheio':'Dia parcial'} · meta R$ ${target}`;
-  window.storage.get('entry:'+key).then(r=>{
-    const val = r ? JSON.parse(r.value) : null;
-    document.getElementById('uberInp').value = val ? val.uber : '';
-    document.getElementById('extraInp').value = val ? val.extra : (key===PIZZARIA_DATE ? PIZZARIA_VALOR : '');
-    document.getElementById('foodInp').value = val ? val.food : 40;
-  }).catch(()=>{
-    document.getElementById('uberInp').value = '';
-    document.getElementById('extraInp').value = key===PIZZARIA_DATE ? PIZZARIA_VALOR : '';
-    document.getElementById('foodInp').value = 40;
-  });
-}
-dateSel.addEventListener('change', updateFormForDate);
-updateFormForDate();
-
-document.getElementById('saveBtn').addEventListener('click', async ()=>{
-  const statusEl = document.getElementById('saveStatus');
-  const btn = document.getElementById('saveBtn');
-  statusEl.style.color = 'var(--muted)';
-  statusEl.textContent = 'Salvando...';
-  btn.disabled = true;
-
-  if(typeof window.storage === 'undefined'){
-    statusEl.style.color = 'var(--red)';
-    statusEl.textContent = 'Erro: window.storage não está disponível neste ambiente.';
-    btn.disabled = false;
-    return;
-  }
-
-  const key = dateSel.value;
-  const uber = parseFloat(document.getElementById('uberInp').value)||0;
-  const extra = parseFloat(document.getElementById('extraInp').value)||0;
-  const food = parseFloat(document.getElementById('foodInp').value)||0;
-  try{
-    const result = await window.storage.set('entry:'+key, JSON.stringify({uber,extra,food}));
-    if(!result){
-      statusEl.style.color = 'var(--red)';
-      statusEl.textContent = 'Erro: o storage retornou vazio ao salvar.';
-      btn.disabled = false;
-      return;
-    }
-    statusEl.style.color = 'var(--green)';
-    statusEl.textContent = 'Salvo ✓ (' + key + ')';
-    await renderAll();
-  }catch(e){
-    statusEl.style.color = 'var(--red)';
-    statusEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : String(e));
-  }finally{
-    btn.disabled = false;
-  }
-});
-
-async function getAllEntries(){
-  const out = {};
-  try{
-    const list = await window.storage.list('entry:');
-    if(list && list.keys){
-      for(const k of list.keys){
-        try{
-          const r = await window.storage.get(k);
-          if(r) out[k.replace('entry:','')] = JSON.parse(r.value);
-        }catch(e){}
-      }
-    }
-  }catch(e){}
+function listDates(startISO, endISO){
+  const out=[]; const d=new Date(startISO+'T12:00:00'); const end=new Date(endISO+'T12:00:00');
+  while(d<=end){ out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')); d.setDate(d.getDate()+1); }
   return out;
 }
 
-async function getPaidBills(){
-  const paid = {};
-  for(const cp of CHECKPOINTS){
-    try{
-      const r = await window.storage.get('billpaid:'+cp.id);
-      paid[cp.id] = r ? JSON.parse(r.value) : false;
-    }catch(e){ paid[cp.id] = false; }
-  }
-  return paid;
+// ===== TABS =====
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ===== DIARIO =====
+const dateSel = document.getElementById('dateSel');
+function populateDateSelect(){
+  dateSel.innerHTML = '';
+  const dates = listDates(STATE.settings.startDate, STATE.settings.endDate);
+  dates.forEach(key=>{
+    const type = dayType(key);
+    const target = dayTarget(key);
+    const [y,m,d] = key.split('-');
+    const wd = WD_ABBR[new Date(key+'T12:00:00').getDay()];
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = `${wd} ${d}/${m} — ${type==='cheio'?'Cheio':'Parcial'} (R$ ${target})`;
+    dateSel.appendChild(opt);
+  });
+  const found = dates.includes(TODAY) ? TODAY : dates[0];
+  if(found) dateSel.value = found;
+}
+function updateFormForDate(){
+  const key = dateSel.value;
+  if(!key) return;
+  document.getElementById('dayTypeTag').textContent = `${dayType(key)==='cheio'?'Dia cheio':'Dia parcial'} · meta ${fmt(dayTarget(key))}`;
+  const val = STATE.entries[key];
+  document.getElementById('uberInp').value = val ? val.uber : '';
+  document.getElementById('extraInp').value = val ? val.extra : '';
+  document.getElementById('foodInp').value = val ? val.food : '';
+}
+dateSel.addEventListener('change', updateFormForDate);
+
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('entryStatus');
+  const btn = document.getElementById('saveBtn');
+  const key = dateSel.value;
+  if(!key){ statusEl.style.color='var(--red)'; statusEl.textContent='Escolha uma data.'; return; }
+  const uber = parseFloat(document.getElementById('uberInp').value)||0;
+  const extra = parseFloat(document.getElementById('extraInp').value)||0;
+  const food = parseFloat(document.getElementById('foodInp').value)||0;
+  btn.disabled = true;
+  statusEl.style.color='var(--muted)'; statusEl.textContent='Salvando...';
+  STATE.entries[key] = {uber, extra, food};
+  const ok = await saveAll();
+  statusEl.style.color = ok ? 'var(--green)' : 'var(--yellow)';
+  statusEl.textContent = ok ? 'Salvo ✓ ('+key+')' : 'Salvo localmente, sem internet no momento.';
+  btn.disabled = false;
+  renderAll();
+});
+
+async function deleteEntry(key){
+  delete STATE.entries[key];
+  await saveAll();
+  renderAll();
 }
 
-async function renderRoad(){
-  const paid = await getPaidBills();
-  const today = toKey(new Date());
+// ===== CONTAS (despesas editáveis) =====
+function newId(){ return 'cp_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
+
+document.getElementById('cpSaveBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('cpStatus');
+  const label = document.getElementById('cpLabel').value.trim();
+  const date = document.getElementById('cpDate').value;
+  const amount = parseFloat(document.getElementById('cpAmount').value);
+  const editId = document.getElementById('cpEditId').value;
+  if(!label || !date || isNaN(amount)){
+    statusEl.style.color='var(--red)'; statusEl.textContent='Preencha descrição, data e valor.'; return;
+  }
+  statusEl.style.color='var(--muted)'; statusEl.textContent='Salvando...';
+  if(editId){
+    const cp = STATE.checkpoints.find(c=>c.id===editId);
+    if(cp){ cp.label=label; cp.date=date; cp.amount=amount; }
+  } else {
+    STATE.checkpoints.push({ id:newId(), date, label, amount, paid:false });
+  }
+  STATE.checkpoints.sort((a,b)=>a.date.localeCompare(b.date));
+  const ok = await saveAll();
+  statusEl.style.color = ok ? 'var(--green)' : 'var(--yellow)';
+  statusEl.textContent = ok ? 'Despesa salva ✓' : 'Salvo localmente, sem internet.';
+  cancelCpEdit();
+  renderAll();
+});
+
+document.getElementById('cpCancelBtn').addEventListener('click', cancelCpEdit);
+function cancelCpEdit(){
+  document.getElementById('cpEditId').value = '';
+  document.getElementById('cpFormTitle').textContent = 'Nova despesa';
+  document.getElementById('cpLabel').value = '';
+  document.getElementById('cpDate').value = '';
+  document.getElementById('cpAmount').value = '';
+  document.getElementById('cpCancelBtn').style.display = 'none';
+  document.getElementById('cpStatus').textContent = '';
+}
+function editCheckpoint(id){
+  const cp = STATE.checkpoints.find(c=>c.id===id);
+  if(!cp) return;
+  document.getElementById('cpEditId').value = cp.id;
+  document.getElementById('cpFormTitle').textContent = 'Editar despesa';
+  document.getElementById('cpLabel').value = cp.label;
+  document.getElementById('cpDate').value = cp.date;
+  document.getElementById('cpAmount').value = cp.amount;
+  document.getElementById('cpCancelBtn').style.display = 'block';
+  document.querySelector('[data-tab="contas"]').click();
+  document.getElementById('cpLabel').scrollIntoView({behavior:'smooth', block:'center'});
+}
+async function deleteCheckpoint(id){
+  if(!confirm('Excluir esta despesa?')) return;
+  STATE.checkpoints = STATE.checkpoints.filter(c=>c.id!==id);
+  await saveAll();
+  renderAll();
+}
+async function togglePaid(id){
+  const cp = STATE.checkpoints.find(c=>c.id===id);
+  if(!cp) return;
+  cp.paid = !cp.paid;
+  await saveAll();
+  renderAll();
+}
+
+// ===== CONFIG =====
+function buildWeekdayPicker(){
+  const el = document.getElementById('weekdayPicker');
+  el.innerHTML = '';
+  WD_ABBR.forEach((name, idx)=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = name;
+    b.className = 'icon-btn';
+    b.style.padding = '6px 12px';
+    const on = STATE.settings.partialWeekdays.includes(idx);
+    if(on){ b.style.borderColor='var(--yellow)'; b.style.color='var(--yellow)'; }
+    b.addEventListener('click', ()=>{
+      const set = new Set(STATE.settings.partialWeekdays);
+      if(set.has(idx)) set.delete(idx); else set.add(idx);
+      STATE.settings.partialWeekdays = Array.from(set).sort();
+      buildWeekdayPicker();
+    });
+    el.appendChild(b);
+  });
+}
+
+function fillConfigForm(){
+  document.getElementById('cfgCheio').value = STATE.settings.cheio;
+  document.getElementById('cfgParcial').value = STATE.settings.parcial;
+  document.getElementById('cfgSaldo').value = STATE.settings.saldoInicial;
+  document.getElementById('cfgStart').value = STATE.settings.startDate;
+  document.getElementById('cfgEnd').value = STATE.settings.endDate;
+  buildWeekdayPicker();
+}
+
+document.getElementById('cfgSaveBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('cfgStatus');
+  const cheio = parseFloat(document.getElementById('cfgCheio').value);
+  const parcial = parseFloat(document.getElementById('cfgParcial').value);
+  const saldo = parseFloat(document.getElementById('cfgSaldo').value);
+  const start = document.getElementById('cfgStart').value;
+  const end = document.getElementById('cfgEnd').value;
+  if(isNaN(cheio) || isNaN(parcial) || !start || !end){
+    statusEl.style.color='var(--red)'; statusEl.textContent='Preencha os valores e o período corretamente.'; return;
+  }
+  if(end < start){
+    statusEl.style.color='var(--red)'; statusEl.textContent='A data final precisa ser depois da inicial.'; return;
+  }
+  statusEl.style.color='var(--muted)'; statusEl.textContent='Salvando...';
+  STATE.settings.cheio = cheio;
+  STATE.settings.parcial = parcial;
+  STATE.settings.saldoInicial = isNaN(saldo) ? 0 : saldo;
+  STATE.settings.startDate = start;
+  STATE.settings.endDate = end;
+  const ok = await saveAll();
+  statusEl.style.color = ok ? 'var(--green)' : 'var(--yellow)';
+  statusEl.textContent = ok ? 'Configurações salvas ✓' : 'Salvo localmente, sem internet.';
+  renderAll();
+});
+
+document.getElementById('resetBtn').addEventListener('click', async ()=>{
+  if(!confirm('Isso apaga TODOS os dias, despesas e configurações salvas na nuvem. Confirma?')) return;
+  STATE = {
+    settings: { cheio:300, parcial:185, saldoInicial:0, partialWeekdays:[0,5,6], startDate: TODAY, endDate: defaultEndDate() },
+    entries: {}, checkpoints: []
+  };
+  await saveAll();
+  renderAll();
+});
+
+// ===== RENDER =====
+function renderRoad(){
   const roadList = document.getElementById('roadList');
   roadList.innerHTML = '';
+  const cps = [...STATE.checkpoints].sort((a,b)=>a.date.localeCompare(b.date));
+  if(!cps.length){ roadList.innerHTML = '<div class="empty">Nenhuma despesa cadastrada. Adicione na aba Contas.</div>'; return; }
 
-  // cumulative target-to-date for reference on each checkpoint
   let cum = 0;
+  const dates = listDates(STATE.settings.startDate, STATE.settings.endDate);
   const cumByDate = {};
-  DATES.forEach(d=>{
-    const key = toKey(d);
-    cum += dayType(d)==='cheio' ? CHEIO : PARCIAL;
-    cumByDate[key] = cum;
-  });
+  dates.forEach(d=>{ cum += dayTarget(d); cumByDate[d] = cum; });
 
-  CHECKPOINTS.forEach(cp=>{
-    const isPaid = paid[cp.id];
-    const isLate = !isPaid && cp.date < today;
+  cps.forEach(cp=>{
+    const isLate = !cp.paid && cp.date < TODAY;
     const div = document.createElement('div');
-    div.className = 'marker' + (isPaid ? ' paid' : (isLate ? ' late' : ''));
-    const [y,m,dd] = cp.date.split('-');
+    div.className = 'marker' + (cp.paid ? ' paid' : (isLate ? ' late' : ''));
+    const [y,m,d] = cp.date.split('-');
+    const metaTxt = cumByDate[cp.date] != null ? `meta de Uber acumulada até aqui: ${fmt(cumByDate[cp.date])}` : '';
     div.innerHTML = `
       <div class="marker-top">
-        <div class="marker-title">${cp.label}</div>
-        <div class="marker-date">${dd}/${m}</div>
+        <div class="marker-title">${escapeHTML(cp.label)}</div>
+        <div class="marker-date">${d}/${m}</div>
       </div>
       <div class="marker-bottom">
         <div class="marker-amt">${fmt(cp.amount)}</div>
-        <button class="paidbtn" data-id="${cp.id}">${isPaid ? 'Paga' : 'Marcar paga'}</button>
+        <div class="marker-actions">
+          <button class="icon-btn paidbtn ${cp.paid?'on':''}" data-id="${cp.id}" data-action="paid">${cp.paid?'Paga':'Marcar paga'}</button>
+        </div>
       </div>
-      <div class="marker-meta">meta de Uber acumulada até aqui: ${fmt(cumByDate[cp.date])}</div>
+      <div class="marker-meta" style="font-size:11px;color:var(--muted-2);margin-top:4px;">${metaTxt}</div>
     `;
     roadList.appendChild(div);
   });
-
-  roadList.querySelectorAll('.paidbtn').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const id = btn.dataset.id;
-      const cur = paid[id];
-      await window.storage.set('billpaid:'+id, JSON.stringify(!cur));
-      renderRoad();
-    });
+  roadList.querySelectorAll('[data-action="paid"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>togglePaid(btn.dataset.id));
   });
 }
 
-async function renderDiary(entries){
+function renderContasList(){
+  const el = document.getElementById('cpList');
+  const empty = document.getElementById('cpEmpty');
+  el.innerHTML = '';
+  const cps = [...STATE.checkpoints].sort((a,b)=>a.date.localeCompare(b.date));
+  if(!cps.length){ empty.style.display='block'; return; }
+  empty.style.display='none';
+  cps.forEach(cp=>{
+    const isLate = !cp.paid && cp.date < TODAY;
+    const div = document.createElement('div');
+    div.className = 'marker' + (cp.paid ? ' paid' : (isLate ? ' late' : ''));
+    const [y,m,d] = cp.date.split('-');
+    div.innerHTML = `
+      <div class="marker-top">
+        <div class="marker-title">${escapeHTML(cp.label)}</div>
+        <div class="marker-date">${d}/${m}/${y}</div>
+      </div>
+      <div class="marker-bottom">
+        <div class="marker-amt">${fmt(cp.amount)}</div>
+        <div class="marker-actions">
+          <button class="icon-btn paidbtn ${cp.paid?'on':''}" data-id="${cp.id}" data-action="paid">${cp.paid?'Paga':'Pendente'}</button>
+          <button class="icon-btn" data-id="${cp.id}" data-action="edit">Editar</button>
+          <button class="icon-btn del" data-id="${cp.id}" data-action="del">Excluir</button>
+        </div>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+  el.querySelectorAll('[data-action="paid"]').forEach(b=>b.addEventListener('click', ()=>togglePaid(b.dataset.id)));
+  el.querySelectorAll('[data-action="edit"]').forEach(b=>b.addEventListener('click', ()=>editCheckpoint(b.dataset.id)));
+  el.querySelectorAll('[data-action="del"]').forEach(b=>b.addEventListener('click', ()=>deleteCheckpoint(b.dataset.id)));
+}
+
+function renderDiary(){
   const body = document.getElementById('diaryBody');
   const empty = document.getElementById('diaryEmpty');
   body.innerHTML = '';
-  const keys = Object.keys(entries).sort().reverse();
-  if(keys.length===0){ empty.style.display='block'; document.getElementById('diaryTable').style.display='none'; return; }
+  const keys = Object.keys(STATE.entries).sort().reverse();
+  if(!keys.length){ empty.style.display='block'; document.getElementById('diaryTable').style.display='none'; return; }
   empty.style.display='none';
   document.getElementById('diaryTable').style.display='table';
-
   keys.forEach(key=>{
-    const d = DATES.find(x=>toKey(x)===key);
-    if(!d) return;
-    const type = dayType(d);
-    const target = type==='cheio' ? CHEIO : PARCIAL;
-    const e = entries[key];
+    const e = STATE.entries[key];
+    const target = dayTarget(key);
     const diff = (e.uber||0) - target;
+    const [y,m,d] = key.split('-');
+    const wd = WD_ABBR[new Date(key+'T12:00:00').getDay()];
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${WD_ABBR[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}</td>
+      <td>${wd} ${d}/${m}</td>
       <td class="r num">${fmt(target)}</td>
       <td class="r num">${fmt(e.uber||0)}</td>
       <td class="r num ${diff>=0?'pos':'neg'}">${diff>=0?'+':''}${fmt(diff)}</td>
@@ -435,37 +621,26 @@ async function renderDiary(entries){
     `;
     body.appendChild(tr);
   });
-
-  body.querySelectorAll('.del').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      await window.storage.delete('entry:'+btn.dataset.key);
-      await renderAll();
-    });
-  });
+  body.querySelectorAll('.del').forEach(btn=>btn.addEventListener('click', ()=>deleteEntry(btn.dataset.key)));
 }
 
-async function renderGauge(entries){
-  const today = new Date();
-  const todayKey = toKey(today);
-  let clampedTodayKey = todayKey;
-  if(todayKey < toKey(START)) clampedTodayKey = toKey(START);
-  if(todayKey > toKey(END)) clampedTodayKey = toKey(END);
+function renderGauge(){
+  const start = STATE.settings.startDate, end = STATE.settings.endDate;
+  let clampedToday = TODAY;
+  if(TODAY < start) clampedToday = start;
+  if(TODAY > end) clampedToday = end;
 
+  const datesToToday = listDates(start, clampedToday);
   let targetToDate = 0;
-  DATES.forEach(d=>{
-    const key = toKey(d);
-    if(key <= clampedTodayKey){
-      targetToDate += dayType(d)==='cheio' ? CHEIO : PARCIAL;
-    }
-  });
+  datesToToday.forEach(d=>{ targetToDate += dayTarget(d); });
 
   let earnedToDate = 0, earnedTotal = 0, extraTotal = 0, foodTotal = 0;
-  Object.keys(entries).forEach(key=>{
-    const e = entries[key];
+  Object.keys(STATE.entries).forEach(key=>{
+    const e = STATE.entries[key];
     earnedTotal += (e.uber||0);
     extraTotal += (e.extra||0);
     foodTotal += (e.food||0);
-    if(key <= clampedTodayKey) earnedToDate += (e.uber||0);
+    if(key <= clampedToday) earnedToDate += (e.uber||0);
   });
 
   const pct = targetToDate>0 ? Math.min(999, Math.round((earnedToDate/targetToDate)*100)) : 0;
@@ -485,36 +660,28 @@ async function renderGauge(entries){
   arc.setAttribute('stroke', pct>=100 ? '#3ECF8E' : (pct>=70 ? '#F4C43D' : '#FF6B5E'));
   document.getElementById('gaugePct').textContent = pct + '%';
 
-  // caixa projetado = saldo inicial + tudo que entrou (uber+extra) - toda comida gasta
-  // (contas marcadas como pagas ainda não abatidas aqui pra manter simples;
-  //  contas em aberto continuam contando como responsabilidade futura)
-  const paid = await getPaidBills();
   let billsPaidTotal = 0;
-  CHECKPOINTS.forEach(cp=>{ if(paid[cp.id]) billsPaidTotal += cp.amount; });
+  STATE.checkpoints.forEach(cp=>{ if(cp.paid) billsPaidTotal += (cp.amount||0); });
 
-  const cashNow = SALDO_INICIAL + earnedTotal + extraTotal - foodTotal - billsPaidTotal;
+  const cashNow = (STATE.settings.saldoInicial||0) + earnedTotal + extraTotal - foodTotal - billsPaidTotal;
   const cashEl = document.getElementById('cashNow');
   cashEl.textContent = fmt(cashNow);
   cashEl.className = 'v num ' + (cashNow>=0?'pos':'neg');
 }
 
-async function renderAll(){
-  const entries = await getAllEntries();
-  await renderGauge(entries);
-  await renderDiary(entries);
-  await renderRoad();
+function escapeHTML(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+
+function renderAll(){
+  populateDateSelect();
+  updateFormForDate();
+  fillConfigForm();
+  renderGauge();
+  renderRoad();
+  renderContasList();
+  renderDiary();
 }
 
-document.getElementById('resetBtn').addEventListener('click', async ()=>{
-  if(!confirm('Isso apaga todos os dias registrados e o status das contas. Confirma?')) return;
-  const list = await window.storage.list('entry:').catch(()=>null);
-  if(list && list.keys){ for(const k of list.keys){ await window.storage.delete(k).catch(()=>{}); } }
-  for(const cp of CHECKPOINTS){ await window.storage.delete('billpaid:'+cp.id).catch(()=>{}); }
-  await renderAll();
-  updateFormForDate();
-});
-
-renderAll();
+loadAll();
 </script>
 </body>
 </html>
