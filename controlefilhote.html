@@ -206,15 +206,15 @@
       <div id="autoModoFields">
         <div class="form-row">
           <div>
-            <label for="cfgPesoCheio">Peso dia cheio</label>
-            <input type="number" id="cfgPesoCheio" min="0.1" step="0.1">
+            <label for="cfgHorasCheio">Horas por dia cheio (Uber)</label>
+            <input type="number" id="cfgHorasCheio" min="0.5" step="0.5">
           </div>
           <div>
-            <label for="cfgPesoParcial">Peso dia parcial</label>
-            <input type="number" id="cfgPesoParcial" min="0.1" step="0.1">
+            <label for="cfgHorasParcial">Horas por dia parcial (antes da pizzaria)</label>
+            <input type="number" id="cfgHorasParcial" min="0.5" step="0.5">
           </div>
         </div>
-        <div style="font-size:11px;color:var(--muted-2);margin-top:6px;">Quanto maior o peso, maior a fatia da meta que cai nesse tipo de dia. Ex: 1.6 e 1.0 significa que um dia cheio "pesa" 1,6x um dia parcial.</div>
+        <div style="font-size:11px;color:var(--muted-2);margin-top:6px;">Quanto mais horas disponíveis num tipo de dia, maior a fatia da meta que cai nele. Ex: se você roda 10h num dia cheio e só 6h num dia parcial (porque à noite vai pra pizzaria), a meta do dia cheio fica maior na mesma proporção (10:6).</div>
         <label for="cfgPizzariaValor">Valor recebido da pizzaria (5º dia útil do mês)</label>
         <input type="number" id="cfgPizzariaValor" min="0" step="1">
       </div>
@@ -331,8 +331,8 @@ function mergeState(d){
       startDate: s.startDate || TODAY,
       endDate: s.endDate || defaultEndDate(),
       autoModo: s.autoModo != null ? s.autoModo : true,
-      pesoCheio: s.pesoCheio != null ? s.pesoCheio : 1.6,
-      pesoParcial: s.pesoParcial != null ? s.pesoParcial : 1.0,
+      pesoCheio: s.horasCheio != null ? s.horasCheio : (s.pesoCheio != null ? s.pesoCheio : 10),
+      pesoParcial: s.horasParcial != null ? s.horasParcial : (s.pesoParcial != null ? s.pesoParcial : 6),
       pizzariaValor: s.pizzariaValor != null ? s.pizzariaValor : 1500
     },
     entries: d.entries && typeof d.entries === 'object' ? d.entries : {},
@@ -435,8 +435,8 @@ function recalcular(){
   let nCheio=0, nParcial=0;
   dias.forEach(d=>{ if(dayType(d)==='cheio') nCheio++; else nParcial++; });
 
-  const pesoCheio = STATE.settings.pesoCheio || 1.6;
-  const pesoParcial = STATE.settings.pesoParcial || 1.0;
+  const pesoCheio = STATE.settings.pesoCheio || 10;
+  const pesoParcial = STATE.settings.pesoParcial || 6;
   const denom = pesoCheio*nCheio + pesoParcial*nParcial;
   let metaCheio = 0, metaParcial = 0;
   if(denom > 0){
@@ -609,8 +609,8 @@ function fillConfigForm(){
   document.getElementById('cfgStart').value = STATE.settings.startDate;
   document.getElementById('cfgEnd').value = STATE.settings.endDate;
   document.getElementById('cfgAutoModo').checked = !!STATE.settings.autoModo;
-  document.getElementById('cfgPesoCheio').value = STATE.settings.pesoCheio;
-  document.getElementById('cfgPesoParcial').value = STATE.settings.pesoParcial;
+  document.getElementById('cfgHorasCheio').value = STATE.settings.pesoCheio != null ? STATE.settings.pesoCheio : 10;
+  document.getElementById('cfgHorasParcial').value = STATE.settings.pesoParcial != null ? STATE.settings.pesoParcial : 6;
   document.getElementById('cfgPizzariaValor').value = STATE.settings.pizzariaValor;
   toggleAutoModoFields();
   buildWeekdayPicker();
@@ -631,8 +631,8 @@ document.getElementById('cfgSaveBtn').addEventListener('click', async ()=>{
   const start = document.getElementById('cfgStart').value;
   const end = document.getElementById('cfgEnd').value;
   const autoModo = document.getElementById('cfgAutoModo').checked;
-  const pesoCheio = parseFloat(document.getElementById('cfgPesoCheio').value);
-  const pesoParcial = parseFloat(document.getElementById('cfgPesoParcial').value);
+  const pesoCheio = parseFloat(document.getElementById('cfgHorasCheio').value);
+  const pesoParcial = parseFloat(document.getElementById('cfgHorasParcial').value);
   const pizzariaValor = parseFloat(document.getElementById('cfgPizzariaValor').value);
   if(!start || !end){
     statusEl.style.color='var(--red)'; statusEl.textContent='Preencha o período corretamente.'; return;
@@ -641,7 +641,7 @@ document.getElementById('cfgSaveBtn').addEventListener('click', async ()=>{
     statusEl.style.color='var(--red)'; statusEl.textContent='Preencha os valores de dia cheio e parcial.'; return;
   }
   if(autoModo && (isNaN(pesoCheio) || isNaN(pesoParcial) || isNaN(pizzariaValor))){
-    statusEl.style.color='var(--red)'; statusEl.textContent='Preencha os pesos e o valor da pizzaria.'; return;
+    statusEl.style.color='var(--red)'; statusEl.textContent='Preencha as horas de cada dia e o valor da pizzaria.'; return;
   }
   if(end < start){
     statusEl.style.color='var(--red)'; statusEl.textContent='A data final precisa ser depois da inicial.'; return;
@@ -667,7 +667,7 @@ document.getElementById('cfgSaveBtn').addEventListener('click', async ()=>{
 document.getElementById('resetBtn').addEventListener('click', async ()=>{
   if(!confirm('Isso apaga TODOS os dias, despesas e configurações salvas na nuvem. Confirma?')) return;
   STATE = {
-    settings: { cheio:300, parcial:185, saldoInicial:0, partialWeekdays:[0,5,6], startDate: TODAY, endDate: defaultEndDate(), autoModo:true, pesoCheio:1.6, pesoParcial:1.0, pizzariaValor:1500 },
+    settings: { cheio:300, parcial:185, saldoInicial:0, partialWeekdays:[0,5,6], startDate: TODAY, endDate: defaultEndDate(), autoModo:true, pesoCheio:10, pesoParcial:6, pizzariaValor:1500 },
     entries: {}, checkpoints: []
   };
   await saveAll();
